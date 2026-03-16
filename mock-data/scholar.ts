@@ -434,7 +434,11 @@ export const disbursements: Disbursement[] = [
     },
 ];
 
-export const placementStages = [
+export const placementStages: Array<{
+    label: string;
+    status: "completed" | "active" | "upcoming";
+    detail: string;
+}> = [
     { label: "Career readiness review", status: "completed", detail: "CV, portfolio, and mentor sign-off complete." },
     { label: "Partner matching", status: "active", detail: "3 organisations shortlisted across public analytics and health-tech." },
     { label: "Interview rounds", status: "upcoming", detail: "Mock interviews scheduled for April 2026." },

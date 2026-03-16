@@ -68,9 +68,14 @@ export function Sidebar({ role = "applicant" }: SidebarProps) {
         { href: "/scholar/settings", icon: Settings, label: "Settings" },
       ],
       donor: [
-        { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-        { href: "/funding", icon: Banknote, label: "Funding" },
-        { href: "/settings", icon: Settings, label: "Settings" },
+        { href: "/donor", icon: LayoutDashboard, label: "Dashboard" },
+        { href: "/donor/sponsored-scholars", icon: Users, label: "Sponsored Scholars" },
+        { href: "/donor/funding-allocation", icon: Banknote, label: "Funding Allocation" },
+        { href: "/donor/impact-reports", icon: ClipboardList, label: "Impact Reports" },
+        { href: "/donor/program-outcomes", icon: GraduationCap, label: "Program Outcomes" },
+        { href: "/donor/annual-reports", icon: FileText, label: "Annual Reports" },
+        { href: "/donor/messages", icon: Mail, label: "Messages" },
+        { href: "/donor/settings", icon: Settings, label: "Settings" },
       ],
       admin: [
         { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -97,9 +102,9 @@ export function Sidebar({ role = "applicant" }: SidebarProps) {
         userName: "Amara Okafor",
       },
       donor: {
-        homeHref: "/dashboard",
-        productLabel: "Funding Portal",
-        userName: "Donor Partner",
+        homeHref: "/donor",
+        productLabel: "Donor Dashboard",
+        userName: "Crescent Impact Fund",
       },
       admin: {
         homeHref: "/dashboard",
@@ -125,10 +130,10 @@ export function Sidebar({ role = "applicant" }: SidebarProps) {
             </div>
             <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
                 {links.map((link) => {
-                    const isScholarHomeLink = role === "scholar" && link.href === meta.homeHref;
+                    const isRoleHomeLink = link.href === meta.homeHref;
                     const isActive =
                         pathname === link.href ||
-                        (!isScholarHomeLink && pathname.startsWith(`${link.href}/`));
+                        (!isRoleHomeLink && pathname.startsWith(`${link.href}/`));
                     const Icon = link.icon;
                     return (
                         <Link
