@@ -39,7 +39,7 @@ const readinessTracks = [
 export default function ScholarDashboardPage() {
     const completedMilestones = scholarMilestones.filter((milestone) => milestone.status === "completed").length;
     const activeAnnouncements = scholarAnnouncements.slice(0, 3);
-    const latestMentorNote = mentorSessions[0];
+    const latestMentorNote = mentorSessions.length > 0 ? mentorSessions[0] : null;
 
     return (
         <PageContainer
@@ -276,42 +276,50 @@ export default function ScholarDashboardPage() {
                             <CardDescription>The latest view from your assigned mentor and support team.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="rounded-xl border bg-muted/30 p-4">
-                                <div className="flex items-center justify-between gap-3">
-                                    <div>
-                                        <p className="font-semibold">{latestMentorNote.theme}</p>
-                                        <p className="text-xs text-muted-foreground">{latestMentorNote.date} · {latestMentorNote.mentor}</p>
-                                    </div>
-                                    <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-                                        {latestMentorNote.sentiment}
-                                    </Badge>
-                                </div>
-                                <p className="mt-3 text-sm leading-6 text-muted-foreground">{latestMentorNote.summary}</p>
-                            </div>
-
-                            <div className="space-y-3">
-                                <div>
-                                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Key strengths</p>
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                        {latestMentorNote.strengths.map((strength) => (
-                                            <Badge key={strength} variant="outline">
-                                                {strength}
+                            {latestMentorNote ? (
+                                <>
+                                    <div className="rounded-xl border bg-muted/30 p-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <p className="font-semibold">{latestMentorNote.theme}</p>
+                                                <p className="text-xs text-muted-foreground">{latestMentorNote.date} · {latestMentorNote.mentor}</p>
+                                            </div>
+                                            <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                                                {latestMentorNote.sentiment}
                                             </Badge>
-                                        ))}
+                                        </div>
+                                        <p className="mt-3 text-sm leading-6 text-muted-foreground">{latestMentorNote.summary}</p>
                                     </div>
+
+                                    <div className="space-y-3">
+                                        <div>
+                                            <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Key strengths</p>
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                {latestMentorNote.strengths.map((strength) => (
+                                                    <Badge key={strength} variant="outline">
+                                                        {strength}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Next actions</p>
+                                            <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
+                                                {latestMentorNote.actionItems.map((item) => (
+                                                    <li key={item} className="flex gap-2">
+                                                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
+                                                        <span>{item}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
+                                    No mentor feedback has been posted yet. Check back after your next mentor session.
                                 </div>
-                                <div>
-                                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Next actions</p>
-                                    <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
-                                        {latestMentorNote.actionItems.map((item) => (
-                                            <li key={item} className="flex gap-2">
-                                                <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
-                                                <span>{item}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            </div>
+                            )}
 
                             <Button asChild variant="outline" className="w-full">
                                 <Link href="/scholar/mentor-feedback">Open Mentor Timeline</Link>

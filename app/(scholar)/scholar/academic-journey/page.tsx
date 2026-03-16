@@ -13,9 +13,21 @@ import {
 } from "@/mock-data/scholar";
 
 const capabilityGrowth = [
-    { label: "Technical depth", value: 91, detail: "Applied modelling and research methods are strong." },
-    { label: "Policy communication", value: 82, detail: "Improving translation of evidence into decision-ready narratives." },
-    { label: "Placement readiness", value: 78, detail: "Portfolio is strong; interview storytelling is next." },
+  {
+    label: "Technical depth",
+    value: 91,
+    detail: "Applied modelling and research methods are strong.",
+  },
+  {
+    label: "Policy communication",
+    value: 82,
+    detail: "Improving translation of evidence into decision-ready narratives.",
+  },
+  {
+    label: "Placement readiness",
+    value: 78,
+    detail: "Portfolio is strong; interview storytelling is next.",
+  },
 ];
 
 export default function AcademicJourneyPage() {

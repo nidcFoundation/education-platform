@@ -140,8 +140,8 @@ export interface MessageThread {
 export const scholarProfile: ScholarProfile = {
     scholarId: "SCH-24-017",
     fullName: "Amara Okafor",
-    email: "amara.okafor@ntdi.org",
-    phone: "+234 803 555 2147",
+    email: "amara.okafor@example.org",
+    phone: "+000-000-0000",
     cohort: "2024",
     program: "Data Science for Public Systems",
     institution: "University of Lagos",
@@ -627,7 +627,7 @@ export const scholarSettings = {
     emergencyContact: {
         name: "Ifeoma Okafor",
         relationship: "Mother",
-        phone: "+234 805 112 3344",
-        email: "ifeoma.okafor@email.com",
+        phone: "000-000-0000",
+        email: "ifeoma.okafor@example.org",
     },
 };

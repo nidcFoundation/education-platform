@@ -12,7 +12,11 @@ const sentimentClasses = {
 };
 
 export default function MentorFeedbackPage() {
-    const latestSession = mentorSessions[0];
+    const latestSession = mentorSessions
+      .slice()
+      .sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      )[0];
 
     return (
         <PageContainer
@@ -24,14 +28,26 @@ export default function MentorFeedbackPage() {
                     <CardContent className="p-6">
                         <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
                             <div className="rounded-xl border bg-muted/20 p-5">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <Badge className={sentimentClasses[latestSession.sentiment]}>
-                                        {latestSession.sentiment}
-                                    </Badge>
-                                    <span className="text-xs text-muted-foreground">{latestSession.date}</span>
-                                </div>
-                                <h2 className="mt-3 text-xl font-semibold">{latestSession.theme}</h2>
-                                <p className="mt-3 text-sm leading-6 text-muted-foreground">{latestSession.summary}</p>
+                                {latestSession ? (
+                                    <>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <Badge className={sentimentClasses[latestSession.sentiment]}>
+                                                {latestSession.sentiment}
+                                            </Badge>
+                                            <span className="text-xs text-muted-foreground">{latestSession.date}</span>
+                                        </div>
+                                        <h2 className="mt-3 text-xl font-semibold">{latestSession.theme}</h2>
+                                        <p className="mt-3 text-sm leading-6 text-muted-foreground">{latestSession.summary}</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Badge variant="outline">No session yet</Badge>
+                                        <h2 className="mt-3 text-xl font-semibold">Mentor session pending</h2>
+                                        <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                                            Once the first mentor session is logged, the latest summary and action items will appear here.
+                                        </p>
+                                    </>
+                                )}
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
@@ -116,11 +132,17 @@ export default function MentorFeedbackPage() {
                                 <CardDescription>Immediate mentor asks for the current cycle.</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                {latestSession.actionItems.map((item) => (
-                                    <div key={item} className="rounded-xl border bg-background p-4 text-sm text-muted-foreground">
-                                        {item}
+                                {latestSession ? (
+                                    latestSession.actionItems.map((item) => (
+                                        <div key={item} className="rounded-xl border bg-background p-4 text-sm text-muted-foreground">
+                                            {item}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
+                                        No mentor action items are available yet.
                                     </div>
-                                ))}
+                                )}
                             </CardContent>
                         </Card>
 
