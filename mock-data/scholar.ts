@@ -23,6 +23,7 @@ export interface ScholarProfile {
     focusAreas: string[];
     goals: string[];
     supportNeeds: string[];
+    avatarUrl?: string;
 }
 
 export interface AcademicTerm {
@@ -141,9 +142,9 @@ export const scholarProfile: ScholarProfile = {
     scholarId: "SCH-24-017",
     fullName: "Amara Okafor",
     email: "amara.okafor@example.org",
-    phone: "+000-000-0000",
+    phone: "+234-800-000-0000",
     cohort: "2024",
-    program: "Data Science for Public Systems",
+    program: "Software Engineering for Public Systems",
     institution: "University of Lagos",
     level: "Year 3 Scholar",
     location: "Lagos, Nigeria",
@@ -163,6 +164,7 @@ export const scholarProfile: ScholarProfile = {
         "Industry placement interview prep",
         "Funding for conference travel and datasets",
     ],
+    avatarUrl: "/avatar-1.png",
 };
 
 export const scholarDashboardStats = [
@@ -439,11 +441,11 @@ export const placementStages: Array<{
     status: "completed" | "active" | "upcoming";
     detail: string;
 }> = [
-    { label: "Career readiness review", status: "completed", detail: "CV, portfolio, and mentor sign-off complete." },
-    { label: "Partner matching", status: "active", detail: "3 organisations shortlisted across public analytics and health-tech." },
-    { label: "Interview rounds", status: "upcoming", detail: "Mock interviews scheduled for April 2026." },
-    { label: "Deployment placement", status: "upcoming", detail: "Final placement expected before Year 4 starts." },
-];
+        { label: "Career readiness review", status: "completed", detail: "CV, portfolio, and mentor sign-off complete." },
+        { label: "Partner matching", status: "active", detail: "3 organisations shortlisted across public analytics and health-tech." },
+        { label: "Interview rounds", status: "upcoming", detail: "Mock interviews scheduled for April 2026." },
+        { label: "Deployment placement", status: "upcoming", detail: "Final placement expected before Year 4 starts." },
+    ];
 
 export const opportunities: Opportunity[] = [
     {

@@ -27,7 +27,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { ApplicationStatus } from "@/types";
 import { CalendarDays, ClipboardPen, FileText, UserCheck } from "lucide-react";
-import { featuredApplicationReview } from "@/mock-data/admin";
+import { featuredApplicationReview } from "@/mock-data/application-system";
 
 export default function ApplicationReviewPage() {
     const [assignedReviewer, setAssignedReviewer] = useState(featuredApplicationReview.currentReviewer);
@@ -35,14 +35,14 @@ export default function ApplicationReviewPage() {
     const [interviewTime, setInterviewTime] = useState(featuredApplicationReview.interview.time);
     const [interviewMode, setInterviewMode] = useState(featuredApplicationReview.interview.mode);
     const [notes, setNotes] = useState(featuredApplicationReview.notes.join("\n\n"));
-    const [decision, setDecision] = useState<ApplicationStatus>(featuredApplicationReview.currentStatus);
+    const [decision, setDecision] = useState<ApplicationStatus>(featuredApplicationReview.currentStatus as ApplicationStatus);
     const [feedback, setFeedback] = useState<string | null>(null);
     const [scores, setScores] = useState<Record<string, number>>(
-        Object.fromEntries(featuredApplicationReview.rubric.map((item) => [item.label, item.score]))
+        Object.fromEntries(featuredApplicationReview.rubric.map((item: { label: string; score: number }) => [item.label, item.score]))
     );
 
     const totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0);
-    const totalPossibleScore = featuredApplicationReview.rubric.reduce((sum, item) => sum + item.max, 0);
+    const totalPossibleScore = featuredApplicationReview.rubric.reduce((sum: number, item: { max: number }) => sum + item.max, 0);
 
     function updateScore(label: string, rawValue: string, maxScore: number) {
         const nextValue = Number(rawValue);
@@ -126,7 +126,7 @@ export default function ApplicationReviewPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {featuredApplicationReview.documents.map((document) => (
+                                        {featuredApplicationReview.documents.map((document: { name: string; status: string; owner: string }) => (
                                             <TableRow key={document.name}>
                                                 <TableCell>{document.name}</TableCell>
                                                 <TableCell>{document.status}</TableCell>
@@ -158,7 +158,7 @@ export default function ApplicationReviewPage() {
                                         <SelectValue placeholder="Assign reviewer" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {featuredApplicationReview.reviewers.map((reviewer) => (
+                                        {featuredApplicationReview.reviewers.map((reviewer: string) => (
                                             <SelectItem key={reviewer} value={reviewer}>
                                                 {reviewer}
                                             </SelectItem>
@@ -239,7 +239,7 @@ export default function ApplicationReviewPage() {
                             <CardDescription>Review rubric covering academic readiness, service potential, and mission fit.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {featuredApplicationReview.rubric.map((item) => {
+                            {featuredApplicationReview.rubric.map((item: { label: string; note: string; max: number }) => {
                                 const inputId = `score-${item.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
                                 return (

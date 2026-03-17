@@ -10,7 +10,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Plus, Download, Search, Filter } from "lucide-react";
-import { adminSponsors } from "@/mock-data/admin";
+import { mockSponsors as adminSponsors } from "@/mock-data/funding-sponsors";
 
 function getSponsorStatusClass(status: "Active" | "Renewal due" | "At risk") {
     if (status === "Active") return "bg-emerald-100 text-emerald-800";
