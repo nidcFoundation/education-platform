@@ -46,9 +46,9 @@ export default function ApplicationReviewPage() {
 
     function updateScore(label: string, rawValue: string, maxScore: number) {
         const nextValue = Number(rawValue);
-       const clamped = Number.isNaN(nextValue)
-         ? 0
-         : Math.max(0, Math.min(item.max, nextValue));
+        const clamped = Number.isNaN(nextValue)
+            ? 0
+            : Math.max(0, Math.min(maxScore, nextValue));
         setScores((current) => ({ ...current, [label]: clamped }));
         setFeedback("Review draft updated locally.");
     }

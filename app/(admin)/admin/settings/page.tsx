@@ -58,9 +58,9 @@ function ToggleGroup({
 }
 
 export default function SystemSettingsPage() {
-    const [automation, setAutomation] = useState(adminSystemSettings.automation);
-    const [access, setAccess] = useState(adminSystemSettings.access);
-    const [communications, setCommunications] = useState(adminSystemSettings.communications);
+    const [automation, setAutomation] = useState<SettingToggle[]>([...adminSystemSettings.automation]);
+    const [access, setAccess] = useState<SettingToggle[]>([...adminSystemSettings.access]);
+    const [communications, setCommunications] = useState<SettingToggle[]>([...adminSystemSettings.communications]);
     const [feedback, setFeedback] = useState<string | null>(null);
 
     function updateToggle(
