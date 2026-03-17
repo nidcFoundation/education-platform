@@ -78,15 +78,17 @@ export function Sidebar({ role = "applicant" }: SidebarProps) {
         { href: "/donor/settings", icon: Settings, label: "Settings" },
       ],
       admin: [
-        { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+        { href: "/admin", icon: LayoutDashboard, label: "Dashboard" },
         { href: "/admin/applications", icon: FileText, label: "Applications" },
         { href: "/admin/scholars", icon: Users, label: "Scholars" },
-        {
-          href: "/admin/funding",
-          icon: Banknote,
-          label: "Funding Distribution",
-        },
-        { href: "/settings", icon: Settings, label: "Settings" },
+        { href: "/admin/programs", icon: GraduationCap, label: "Programs" },
+        { href: "/admin/cohorts", icon: Flag, label: "Cohorts" },
+        { href: "/admin/funding", icon: Banknote, label: "Funding" },
+        { href: "/admin/sponsors", icon: Briefcase, label: "Sponsors" },
+        { href: "/admin/impact-reports", icon: ClipboardList, label: "Impact Reports" },
+        { href: "/admin/content", icon: MessageSquare, label: "Content" },
+        { href: "/admin/users", icon: User, label: "Users" },
+        { href: "/admin/settings", icon: Settings, label: "System Settings" },
       ],
     } as const;
 
@@ -107,7 +109,7 @@ export function Sidebar({ role = "applicant" }: SidebarProps) {
         userName: "Crescent Impact Fund",
       },
       admin: {
-        homeHref: "/dashboard",
+        homeHref: "/admin",
         productLabel: "Admin Console",
         userName: "Programme Admin",
       },
