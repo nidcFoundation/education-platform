@@ -1,0 +1,76 @@
+import { Program, FocusArea } from "@/types";
+
+export const mockFocusAreas: FocusArea[] = [
+    {
+        id: "fa-tech",
+        name: "Technology & Software",
+        description: "AI, cybersecurity, and full-stack engineering for national digital infrastructure.",
+        iconName: "Zap",
+    },
+    {
+        id: "fa-health",
+        name: "Healthcare Systems",
+        description: "Public health, biomedical engineering, and health informatics.",
+        iconName: "HeartPulse",
+    },
+    {
+        id: "fa-energy",
+        name: "Sustainable Energy",
+        description: "Renewables, agritech, and climate-resilient engineering.",
+        iconName: "Leaf",
+    },
+    {
+        id: "fa-manu",
+        name: "Advanced Manufacturing",
+        description: "Robotics, industrial design, and logistics automation.",
+        iconName: "Cog",
+    },
+];
+
+export const mockPrograms: Program[] = [
+    {
+        id: "prog-tech",
+        title: "Software Engineering for Public Systems",
+        description: "Building the next generation of systems architects powering Africa's digital economy.",
+        focusAreaId: "fa-tech",
+        lead: "Dr. Olu Bakare",
+        location: "Lagos & Abuja",
+        duration: "4 Years",
+        capacity: 200,
+        activeScholarsCount: 184,
+        completionRate: 98.2,
+        placementRate: 95.4,
+        budget: "₦1.2B",
+        status: "active",
+    },
+    {
+        id: "prog-health",
+        title: "Health Informatics & Delivery",
+        description: "Training professionals to strengthen Nigeria's public health data infrastructure.",
+        focusAreaId: "fa-health",
+        lead: "Prof. Grace Nnaji",
+        location: "Nationwide",
+        duration: "5 Years",
+        capacity: 150,
+        activeScholarsCount: 142,
+        completionRate: 96.5,
+        placementRate: 92.1,
+        budget: "₦0.8B",
+        status: "active",
+    },
+    {
+        id: "prog-energy",
+        title: "Renewable Energy Research",
+        description: "Developing leaders in solar, wind, and smart-grid migration.",
+        focusAreaId: "fa-energy",
+        lead: "Engr. Musa Bello",
+        location: "Kano & Kaduna",
+        duration: "4 Years",
+        capacity: 100,
+        activeScholarsCount: 96,
+        completionRate: 94.8,
+        placementRate: 89.5,
+        budget: "₦1.1B",
+        status: "active",
+    },
+];

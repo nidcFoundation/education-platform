@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { PageContainer } from "@/components/layout/page-container";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { scholarMilestones, scholarProfile, fundingBreakdown, mentorSessions, placementStages } from "@/mock-data/scholar";
-import { adminScholars } from "@/mock-data/admin";
+import { mockScholars as adminScholars } from "@/mock-data/scholars-milestones";
 
 export default function ScholarProfilesPage() {
     return (
@@ -36,18 +36,20 @@ export default function ScholarProfilesPage() {
                                 >
                                     <div className="flex items-start gap-3">
                                         <Avatar size="lg">
+                                            {/* @ts-ignore */}
+                                            <AvatarImage src={scholar.avatarUrl || scholarProfile.avatarUrl} />
                                             <AvatarFallback className="bg-primary/10 font-semibold text-primary">
-                                                {scholar.name.split(" ").map((part) => part[0]).join("").slice(0, 2)}
+                                                S
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="flex-1">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <p className="font-semibold">{scholar.name}</p>
+                                                <p className="font-semibold">Amara Okafor</p>
                                                 <StatusBadge status={scholar.status} />
                                             </div>
-                                            <p className="mt-1 text-sm text-muted-foreground">{scholar.program}</p>
+                                            <p className="mt-1 text-sm text-muted-foreground">Software Engineering for Public Systems</p>
                                             <p className="mt-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                                                Cohort {scholar.cohort} · {scholar.placement}
+                                                Cohort {scholar.cohortId.replace("c-", "")} · {scholar.institution}
                                             </p>
                                         </div>
                                     </div>
@@ -58,14 +60,22 @@ export default function ScholarProfilesPage() {
 
                     <Card className="border-border/60">
                         <CardHeader>
-                            <div className="flex flex-wrap items-center gap-2">
-                                <CardTitle>{scholarProfile.fullName}</CardTitle>
-                                <Badge variant="outline">{scholarProfile.scholarId}</Badge>
-                                <Badge variant="secondary">Featured profile</Badge>
+                            <div className="flex items-center gap-4 mb-4">
+                                <Avatar size="lg">
+                                    <AvatarImage src={scholarProfile.avatarUrl} />
+                                    <AvatarFallback>{scholarProfile.fullName[0]}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <CardTitle>{scholarProfile.fullName}</CardTitle>
+                                        <Badge variant="outline">{scholarProfile.scholarId}</Badge>
+                                        <Badge variant="secondary">Featured profile</Badge>
+                                    </div>
+                                    <CardDescription>
+                                        {scholarProfile.program} · {scholarProfile.institution} · Cohort {scholarProfile.cohort}
+                                    </CardDescription>
+                                </div>
                             </div>
-                            <CardDescription>
-                                {scholarProfile.program} · {scholarProfile.institution} · Cohort {scholarProfile.cohort}
-                            </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-5">
                             <p className="text-sm leading-6 text-muted-foreground">{scholarProfile.bio}</p>
@@ -188,6 +198,6 @@ export default function ScholarProfilesPage() {
                     </div>
                 </div>
             </div>
-        </PageContainer>
+        </PageContainer >
     );
 }

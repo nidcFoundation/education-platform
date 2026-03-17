@@ -7,65 +7,34 @@ import {
     ArrowRight, BookOpen, GraduationCap, Building2, Users, Target, CheckCircle2, Globe, TrendingUp,
     Zap, HeartPulse, Leaf, Cog, Calendar, MapPin, Briefcase,
 } from "lucide-react";
-import { mockNews, mockScholars, mockPartners } from "@/mock-data";
+import { mockNews, mockPartners, mockImpactMetrics, mockFocusAreas } from "@/mock-data";
 
 const impactNumbers = [
-    { value: "1,250+", label: "Active Scholars", sub: "Across all 36 states" },
+    { value: mockImpactMetrics[0].value.toString() + "+", label: mockImpactMetrics[0].label, sub: "Across all 36 states" },
     { value: "45", label: "Partner Institutions", sub: "Academic & corporate" },
-    { value: "98.2%", label: "Graduation Rate", sub: "Industry-leading outcome" },
-    { value: "₦18.6B", label: "Funds Deployed", sub: "100% transparent" },
+    { value: mockImpactMetrics[1].value.toString() + "%", label: mockImpactMetrics[1].label, sub: "Industry-leading outcome" },
+    { value: mockImpactMetrics[2].value as string, label: mockImpactMetrics[2].label, sub: "100% transparent" },
 ];
 
 const focusAreas = [
-    { title: "Technology & Software", icon: Zap, desc: "AI, cybersecurity, full-stack engineering" },
-    { title: "Healthcare Systems", icon: HeartPulse, desc: "Clinical, biomedical, public health" },
-    { title: "Sustainable Energy", icon: Leaf, desc: "Renewables, agritech, climate" },
-    { title: "Advanced Manufacturing", icon: Cog, desc: "Robotics, industrial design, logistics" },
+    { title: mockFocusAreas[0].name, icon: Zap, desc: mockFocusAreas[0].description },
+    { title: mockFocusAreas[1].name, icon: HeartPulse, desc: mockFocusAreas[1].description },
+    { title: mockFocusAreas[2].name, icon: Leaf, desc: mockFocusAreas[2].description },
+    { title: mockFocusAreas[3].name, icon: Cog, desc: mockFocusAreas[3].description },
 ];
 
 const spotlightScholars = [
-    { name: "Aisha Mohammed", state: "Kano", discipline: "Software Engineering", quote: "The Initiative gave me the infrastructure to compete globally, while keeping my roots firmly Nigerian." },
+    { name: "Amara Okafor", state: "Anambra", discipline: "Data Science for Public Systems", quote: "The Initiative gave me the infrastructure to compete globally, while keeping my roots firmly Nigerian." },
     { name: "Chukwuemeka Okoro", state: "Enugu", discipline: "Bio-Medical Engineering", quote: "From a public secondary school in Enugu to the National Health Institute — this program builds bridges others don't even see." },
-    { name: "Zainab Usman", state: "Kaduna", discipline: "Cybersecurity", quote: "I applied not knowing if I stood a chance. The selection process was the most rigorous and fair process I have ever experienced." },
+    { name: "Zainab Yusuf", state: "Kaduna", discipline: "Cybersecurity & Digital Trust", quote: "I applied not knowing if I stood a chance. The selection process was the most rigorous and fair process I have ever experienced." },
 ];
+
+import { Hero } from "@/components/sections/hero";
 
 export default function HomePage() {
     return (
         <div className="flex flex-col w-full">
-            {/* ── Hero ───────────────────────────────────────────────────────── */}
-            <section className="relative w-full py-24 md:py-36 overflow-hidden bg-primary/5">
-                <div className="container mx-auto px-4 relative z-10">
-                    <div className="max-w-3xl space-y-8">
-                        <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-                            <span className="flex h-2 w-2 rounded-full bg-primary mr-2 animate-pulse" />
-                            2025 Cohort Applications Now Open
-                        </div>
-                        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight text-foreground leading-[1.05]">
-                            Building Nigeria's Most Critical{" "}
-                            <span className="text-primary">Talent Infrastructure</span>
-                        </h1>
-                        <p className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-2xl">
-                            A national commitment to identify, fund, and deploy exceptional Nigerian talent — transforming brilliance into measurable impact across every sector of the economy.
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-4 pt-2">
-                            <Link href="/apply">
-                                <Button size="lg" className="w-full sm:w-auto text-base h-12 px-8 font-semibold">
-                                    Apply Now <ArrowRight className="ml-2 h-4 w-4" />
-                                </Button>
-                            </Link>
-                            <Link href="/about">
-                                <Button size="lg" variant="outline" className="w-full sm:w-auto text-base h-12 px-8">
-                                    About the Initiative
-                                </Button>
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-                <div className="absolute top-0 right-0 -z-10 w-full h-full overflow-hidden pointer-events-none opacity-40">
-                    <div className="absolute -top-[10%] -right-[10%] w-[50%] h-[70%] rounded-full bg-primary/20 blur-[120px]" />
-                    <div className="absolute top-[40%] right-[10%] w-[30%] h-[40%] rounded-full bg-accent/20 blur-[100px]" />
-                </div>
-            </section>
+            <Hero />
 
             {/* ── Mission Statement ──────────────────────────────────────────── */}
             <SectionWrapper className="bg-background border-b border-border/50">

@@ -14,9 +14,15 @@ import {
 } from "@/components/ui/table";
 import { KeyRound, Shield, UserCheck, Users } from "lucide-react";
 import {
-    adminUsers,
-    userRoleBreakdown,
-} from "@/mock-data/admin";
+    mockUsers as adminUsers,
+} from "@/mock-data/users";
+
+const userRoleBreakdown = [
+    { label: "Applicants", value: 1482, color: "#0f766e" },
+    { label: "Scholars", value: 864, color: "#0284c7" },
+    { label: "Reviewers", value: 58, color: "#d97706" },
+    { label: "Admins", value: 12, color: "#dc2626" },
+];
 
 const userMetrics = [
     { title: "User Accounts", value: "214", description: "Staff, reviewers, and partner accounts", icon: Users },

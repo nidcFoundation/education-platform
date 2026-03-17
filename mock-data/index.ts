@@ -1,72 +1,23 @@
-// Mock data for the National Talent Development Initiative platform
+// Consolidated Mock Data for the National Talent Development Initiative platform
 // All data is illustrative and used for development/demonstration purposes
 
-export const mockScholars = [
-    { id: "1", name: "Aisha Mohammed", state: "Kano", discipline: "Software Engineering", cohort: "2024", placement: "FinTech Innovation Hub", status: "active", institution: "University of Lagos", avatarUrl: "" },
-    { id: "2", name: "Chukwuemeka Okoro", state: "Enugu", discipline: "Bio-Medical Engineering", cohort: "2023", placement: "National Health Institute", status: "graduated", institution: "Ahmadu Bello University", avatarUrl: "" },
-    { id: "3", name: "Oluwaseun Adeyemi", state: "Lagos", discipline: "Renewable Energy", cohort: "2025", placement: "CleanTech Solutions", status: "active", institution: "University of Ibadan", avatarUrl: "" },
-    { id: "4", name: "Fatima Abubakar", state: "Borno", discipline: "Data Science", cohort: "2024", placement: "Defense Intelligence", status: "active", institution: "Bayero University Kano", avatarUrl: "" },
-    { id: "5", name: "David Ekanem", state: "Akwa Ibom", discipline: "Industrial Robotics", cohort: "2023", placement: "Automated Manufacturing Co.", status: "graduated", institution: "University of Port Harcourt", avatarUrl: "" },
-    { id: "6", name: "Zainab Usman", state: "Kaduna", discipline: "Cybersecurity", cohort: "2025", placement: "Federal Cyber Command", status: "active", institution: "Covenant University", avatarUrl: "" },
-    { id: "7", name: "Bolaji Olayinka", state: "Oyo", discipline: "Smart Agriculture", cohort: "2023", placement: "Agri-Tech Africa", status: "graduated", institution: "Obafemi Awolowo University", avatarUrl: "" },
-    { id: "8", name: "Nnamdi Kalu", state: "Abia", discipline: "Quantum Computing", cohort: "2024", placement: "R&D National Institute", status: "active", institution: "University of Nigeria", avatarUrl: "" },
-    { id: "9", name: "Hauwa Bello", state: "Sokoto", discipline: "Public Health Policy", cohort: "2024", placement: "Federal Ministry of Health", status: "active", institution: "University of Abuja", avatarUrl: "" },
-    { id: "10", name: "Emeka Nwachukwu", state: "Imo", discipline: "Structural Engineering", cohort: "2023", placement: "Federal Infrastructure Works", status: "graduated", institution: "Federal University of Technology, Owerri", avatarUrl: "" },
-    { id: "11", name: "Amina Garba", state: "Jigawa", discipline: "Climate Science", cohort: "2025", placement: "Environmental Research Institute", status: "active", institution: "University of Maiduguri", avatarUrl: "" },
-    { id: "12", name: "Tunde Fashola", state: "Kwara", discipline: "FinTech & Digital Banking", cohort: "2024", placement: "Central Bank Innovation Lab", status: "active", institution: "University of Ilorin", avatarUrl: "" },
-];
+export * from "./users";
+export * from "./programs-focus";
+export * from "./application-system";
+export * from "./funding-sponsors";
+export * from "./impact-reports";
+export * from "./scholars-milestones";
 
-export const mockPrograms = [
-    {
-        id: "tech",
-        title: "Technology & Software Engineering",
-        type: "Engineering",
-        status: "active",
-        location: "Lagos & Abuja",
-        duration: "4 Years (Undergraduate)",
-        capacity: 200,
-        description: "Build the next generation of full-stack developers, AI researchers, and systems architects powering Africa's digital economy.",
-        modules: ["Algorithms & Data Structures", "Machine Learning", "Cloud Architecture", "Cybersecurity"],
-        outcomes: ["98% employment rate within 6 months", "Average starting salary ₦3.5M/year", "Top placements at Google, MTN, Flutterwave"],
-    },
-    {
-        id: "health",
-        title: "Healthcare Delivery Systems",
-        type: "Medical Sciences",
-        status: "active",
-        location: "Nationwide Partner Hospitals",
-        duration: "5-6 Years (Medical/Health Sciences)",
-        capacity: 150,
-        description: "Training medical professionals, health administrators, and biomedical engineers to strengthen Nigeria's health infrastructure.",
-        modules: ["Clinical Excellence", "Public Health Policy", "Health Technology", "Epidemiology"],
-        outcomes: ["Placed in 42 federal hospitals", "15 scholars in senior MoH roles", "3 published medical research papers per cohort"],
-    },
-    {
-        id: "energy",
-        title: "Sustainable Energy & Agriculture",
-        type: "Environmental Sciences",
-        status: "active",
-        location: "Northern & South-South Campuses",
-        duration: "4 Years",
-        capacity: 100,
-        description: "Developing leaders in renewable energy, smart farming, and climate-resilient agriculture for Nigeria's long-term food and energy security.",
-        modules: ["Solar & Wind Systems", "Precision Agriculture", "Climate Policy", "Supply Chain"],
-        outcomes: ["₦12B in energy projects led by alumni", "4 viable agri-businesses founded by scholars"],
-    },
-    {
-        id: "manufacturing",
-        title: "Advanced Manufacturing & Engineering",
-        type: "Industrial Engineering",
-        status: "upcoming",
-        location: "Port Harcourt & Kano",
-        duration: "4 Years",
-        capacity: 80,
-        description: "Equipping engineers for industrialization, supply chain optimization, and automated manufacturing for national infrastructure growth.",
-        modules: ["Robotics & CNC", "Industrial Design", "Logistics & Supply Chain", "Materials Science"],
-        outcomes: ["Expected launch Q1 2026", "Industry partners: Dangote Group, Julius Berger, NAOC"],
-    },
-];
+// Legacy exports for backward compatibility if needed, or re-mapped versions
+import { mockScholars as scholars } from "./scholars-milestones";
+import { mockPrograms as programs } from "./programs-focus";
+import { mockImpactMetrics as impact } from "./impact-reports";
 
+export const legacyMockScholars = scholars;
+export const legacyMockPrograms = programs;
+export const legacyMockImpactMetrics = impact;
+
+// Common Helpers or Global Mock Data
 export const mockPartners = [
     { id: "1", name: "University of Lagos", type: "Academic Institution", tier: "Founding", location: "Lagos" },
     { id: "2", name: "Ahmadu Bello University", type: "Academic Institution", tier: "Founding", location: "Zaria" },
@@ -77,9 +28,7 @@ export const mockPartners = [
     { id: "7", name: "Central Bank of Nigeria", type: "Government", tier: "Strategic", location: "Abuja" },
     { id: "8", name: "Dangote Group", type: "Private Sector", tier: "Corporate", location: "Lagos" },
     { id: "9", name: "Flutterwave", type: "Private Sector", tier: "Corporate", location: "Lagos" },
-    { id: "10", name: "Nigerian National Petroleum Company", type: "Government Enterprise", tier: "Corporate", location: "Abuja" },
-    { id: "11", name: "Access Bank", type: "Private Sector", tier: "Corporate", location: "Lagos" },
-    { id: "12", name: "African Development Bank", type: "International", tier: "Development Partner", location: "Abidjan" },
+    { id: "10", name: "NNPC", type: "Government Enterprise", tier: "Corporate", location: "Abuja" },
 ];
 
 export const mockNews = [
@@ -94,73 +43,14 @@ export const mockNews = [
     {
         id: "2",
         title: "Scholar Success: Aisha Mohammed Joins FinTech Board at 23",
-        excerpt: "2024 NTDI scholar Aisha Mohammed has been appointed to the advisory board of a leading Nigerian FinTech company, one of the youngest ever to hold the position.",
+        excerpt: "2024 NTDI scholar Aisha Mohammed has been appointed to the advisory board of a leading Nigerian FinTech company.",
         category: "Scholar Story",
         date: "February 20, 2026",
         readTime: "5 min read",
     },
-    {
-        id: "3",
-        title: "African Development Bank Partners With NTDI for ₦2B Innovation Fund",
-        excerpt: "The African Development Bank formalizes a landmark partnership to deploy ₦2 billion over five years to expand the NTDI's capacity and geographic reach.",
-        category: "Partnerships",
-        date: "January 31, 2026",
-        readTime: "4 min read",
-    },
-    {
-        id: "4",
-        title: "2024 Annual Impact Report: 98.2% Graduation Rate Achieved",
-        excerpt: "The NTDI's 2024 Annual Report documents a record 98.2% graduation rate, ₦4.2B in scholarships deployed, and 850+ scholars placed in critical national sectors.",
-        category: "Report",
-        date: "January 15, 2026",
-        readTime: "6 min read",
-    },
-    {
-        id: "5",
-        title: "New Healthcare Track Expands to River Niger Delta Institutions",
-        excerpt: "The healthcare program expands its reach to three new partner institutions in the South-South region, adding 50 new scholarship slots for the 2025 intake.",
-        category: "Programs",
-        date: "December 10, 2025",
-        readTime: "3 min read",
-    },
-    {
-        id: "6",
-        title: "NTDI Scholars Take Top Positions at National Hackathon",
-        excerpt: "Five current NTDI scholars swept the top three prizes at the 2025 Nigerian National Innovation Hackathon, building a real-time electricity grid monitoring system.",
-        category: "Achievement",
-        date: "November 28, 2025",
-        readTime: "4 min read",
-    },
 ];
 
-export const mockImpactMetrics = {
-    scholars: { total: 1250, active: 890, graduated: 360 },
-    states: 36,
-    partners: 45,
-    graduationRate: 98.2,
-    placementRate: 95.4,
-    fundsDeployed: "₦18.6B",
-    cohorts: 5,
-    sectorBreakdown: [
-        { sector: "Technology", count: 380, pct: 30 },
-        { sector: "Healthcare", count: 250, pct: 20 },
-        { sector: "Finance & Banking", count: 188, pct: 15 },
-        { sector: "Government & Policy", count: 163, pct: 13 },
-        { sector: "Energy & Environment", count: 125, pct: 10 },
-        { sector: "Manufacturing", count: 144, pct: 12 },
-    ],
-    fundingBreakdown: [
-        { label: "Tuition & Academic Fees", pct: 65 },
-        { label: "Scholar Stipends & Housing", pct: 25 },
-        { label: "Leadership Bootcamps", pct: 10 },
-    ],
-};
-
 export const mockFAQs = [
-    { q: "Who is eligible to apply?", a: "Nigerian citizens aged 16–25 who have achieved minimum 5 A-level credits (or equivalent) and demonstrate exceptional academic potential, character, and national commitment." },
-    { q: "Is the scholarship fully funded?", a: "Yes. The scholarship covers 100% of tuition, accommodation, study materials, and provides a monthly living stipend. No additional funding is required from the scholar or their family." },
-    { q: "How are scholars selected?", a: "Selection is entirely meritocratic and involves three rounds: a written aptitude assessment, a supervised group challenge, and a structured interview with the selection board." },
-    { q: "What is the service commitment?", a: "Scholars commit to at minimum 3 years of post-graduation service in a designated national-priority sector. Placement is facilitated through our institutional partner network." },
-    { q: "Can I choose my area of study?", a: "Scholars indicate preferred disciplines during the application, and placement is made based on preference, assessment results, and national strategic need. All efforts are made to align personal ambition with national priority." },
-    { q: "When is the application deadline?", a: "Applications for the 2025 cohort close on April 30, 2026. Late applications will not be accepted under any circumstances." },
+    { q: "Who is eligible to apply?", a: "Nigerian citizens aged 16–25 who have achieved minimum 5 A-level credits (or equivalent) and demonstrate exceptional academic potential." },
+    { q: "Is the scholarship fully funded?", a: "Yes. The scholarship covers 100% of tuition, accommodation, study materials, and provides a monthly living stipend." },
 ];
