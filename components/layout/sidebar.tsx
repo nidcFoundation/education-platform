@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   FileText,
@@ -17,7 +18,10 @@ import {
   Mail,
   MessageSquare,
   User,
+  LogOut,
 } from "lucide-react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
 
 interface SidebarProps {
   role?: "applicant" | "scholar" | "donor" | "admin";
@@ -25,6 +29,14 @@ interface SidebarProps {
 
 export function SidebarContent({ role = "applicant" }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleSignOut = async () => {
+    const supabase = getSupabaseBrowserClient();
+    await supabase.auth.signOut();
+    router.replace("/login");
+    router.refresh();
+  };
 
   const roleLinks = {
     applicant: [
@@ -155,7 +167,7 @@ export function SidebarContent({ role = "applicant" }: SidebarProps) {
           );
         })}
       </nav>
-      <div className="p-4 border-t mt-auto">
+      <div className="p-4 border-t mt-auto space-y-2">
         <div className="flex items-center gap-3 px-3 py-2">
           <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
             <Users className="h-4 w-4 text-muted-foreground" />
@@ -165,6 +177,15 @@ export function SidebarContent({ role = "applicant" }: SidebarProps) {
             <span className="text-xs text-muted-foreground mt-1 capitalize">{role}</span>
           </div>
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-9 px-3"
+          onClick={handleSignOut}
+        >
+          <LogOut className="h-4 w-4" />
+          Sign Out
+        </Button>
       </div>
     </div>
   );
