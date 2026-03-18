@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   description: "Platform helping talented young Nigerians access education while ensuring transparent funding and measurable national impact.",
 };
 
+import { Toaster } from "sonner";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -15,6 +17,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="font-sans antialiased">
         {children}
+        <Toaster position="top-center" richColors />
       </body>
     </html>
   );

@@ -5,8 +5,56 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ArrowRight, Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
+import { toast } from "sonner";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getDefaultRedirectPath, getRoleFromMetadata } from "@/lib/auth/roles";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [errorMessage, setErrorMessage] = useState("");
+    const router = useRouter();
+
+    const handleSignIn = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        setErrorMessage("");
+
+        try {
+            const supabase = getSupabaseBrowserClient();
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) {
+                setErrorMessage(error.message);
+                toast.error("Sign-in failed", {
+                    description: error.message,
+                });
+                return;
+            }
+
+            const role = getRoleFromMetadata(data.user.user_metadata);
+            toast.success("Welcome back!", {
+                description: "You have successfully signed in.",
+            });
+            router.replace(getDefaultRedirectPath(role));
+            router.refresh();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Unable to sign you in right now.";
+            setErrorMessage(message);
+            toast.error("Authentication error", {
+                description: message,
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     return (
         <div className="w-full max-w-md">
             {/* Header */}
@@ -34,6 +82,8 @@ export default function LoginPage() {
                                 type="email"
                                 placeholder="you@example.com"
                                 className="pl-9"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                             />
                         </div>
                     </div>

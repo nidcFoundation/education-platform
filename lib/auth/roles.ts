@@ -16,6 +16,10 @@ export type AppRole = (typeof APP_ROLES)[number];
 const APPLICANT_PREFIXES = ["/dashboard", "/application", "/status", "/notifications", "/settings"];
 const ADMIN_ROLES: AppRole[] = ["admin", "reviewer", "partner"];
 
+function matchesProtectedPrefix(pathname: string, prefix: string): boolean {
+    return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
 export function isAuthIntent(value: string | null): value is AuthIntent {
     return value !== null && AUTH_INTENTS.includes(value as AuthIntent);
 }
@@ -57,27 +61,27 @@ export function getRoleFromMetadata(metadata: unknown): AppRole {
 }
 
 export function isProtectedPath(pathname: string): boolean {
-    if (pathname.startsWith("/admin")) return true;
-    if (pathname.startsWith("/donor")) return true;
-    if (pathname.startsWith("/scholar")) return true;
+    if (matchesProtectedPrefix(pathname, "/admin")) return true;
+    if (matchesProtectedPrefix(pathname, "/donor")) return true;
+    if (matchesProtectedPrefix(pathname, "/scholar")) return true;
 
-    return APPLICANT_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+    return APPLICANT_PREFIXES.some((prefix) => matchesProtectedPrefix(pathname, prefix));
 }
 
 export function canAccessPath(pathname: string, role: AppRole): boolean {
-    if (pathname.startsWith("/admin")) {
+    if (matchesProtectedPrefix(pathname, "/admin")) {
         return ADMIN_ROLES.includes(role);
     }
 
-    if (pathname.startsWith("/donor")) {
+    if (matchesProtectedPrefix(pathname, "/donor")) {
         return role === "donor";
     }
 
-    if (pathname.startsWith("/scholar")) {
+    if (matchesProtectedPrefix(pathname, "/scholar")) {
         return role === "scholar";
     }
 
-    if (APPLICANT_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+    if (APPLICANT_PREFIXES.some((prefix) => matchesProtectedPrefix(pathname, prefix))) {
         return role === "applicant";
     }
 

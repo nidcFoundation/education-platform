@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface SidebarProps {
   role?: "applicant" | "scholar" | "donor" | "admin";
@@ -33,7 +34,18 @@ export function SidebarContent({ role = "applicant" }: SidebarProps) {
 
   const handleSignOut = async () => {
     const supabase = getSupabaseBrowserClient();
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      toast.error("Sign-out failed", {
+        description: error.message,
+      });
+      return;
+    }
+
+    toast.success("Signed out", {
+      description: "You have been successfully signed out.",
+    });
     router.replace("/login");
     router.refresh();
   };
@@ -81,11 +93,31 @@ export function SidebarContent({ role = "applicant" }: SidebarProps) {
     ],
     donor: [
       { href: "/donor", icon: LayoutDashboard, label: "Dashboard" },
-      { href: "/donor/sponsored-scholars", icon: Users, label: "Sponsored Scholars" },
-      { href: "/donor/funding-allocation", icon: Banknote, label: "Funding Allocation" },
-      { href: "/donor/impact-reports", icon: ClipboardList, label: "Impact Reports" },
-      { href: "/donor/program-outcomes", icon: GraduationCap, label: "Program Outcomes" },
-      { href: "/donor/annual-reports", icon: FileText, label: "Annual Reports" },
+      {
+        href: "/donor/sponsored-scholars",
+        icon: Users,
+        label: "Sponsored Scholars",
+      },
+      {
+        href: "/donor/funding-allocation",
+        icon: Banknote,
+        label: "Funding Allocation",
+      },
+      {
+        href: "/donor/impact-reports",
+        icon: ClipboardList,
+        label: "Impact Reports",
+      },
+      {
+        href: "/donor/program-outcomes",
+        icon: GraduationCap,
+        label: "Program Outcomes",
+      },
+      {
+        href: "/donor/annual-reports",
+        icon: FileText,
+        label: "Annual Reports",
+      },
       { href: "/donor/messages", icon: Mail, label: "Messages" },
       { href: "/donor/settings", icon: Settings, label: "Settings" },
     ],
@@ -97,7 +129,11 @@ export function SidebarContent({ role = "applicant" }: SidebarProps) {
       { href: "/admin/cohorts", icon: Flag, label: "Cohorts" },
       { href: "/admin/funding", icon: Banknote, label: "Funding" },
       { href: "/admin/sponsors", icon: Briefcase, label: "Sponsors" },
-      { href: "/admin/impact-reports", icon: ClipboardList, label: "Impact Reports" },
+      {
+        href: "/admin/impact-reports",
+        icon: ClipboardList,
+        label: "Impact Reports",
+      },
       { href: "/admin/content", icon: MessageSquare, label: "Content" },
       { href: "/admin/users", icon: User, label: "Users" },
       { href: "/admin/settings", icon: Settings, label: "System Settings" },
@@ -138,8 +174,12 @@ export function SidebarContent({ role = "applicant" }: SidebarProps) {
             <span className="text-primary-foreground font-bold text-sm">N</span>
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-sm leading-none">Talent Initiative</span>
-            <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mt-1">{meta.productLabel}</span>
+            <span className="font-bold text-sm leading-none">
+              Talent Initiative
+            </span>
+            <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mt-1">
+              {meta.productLabel}
+            </span>
           </div>
         </Link>
       </div>
@@ -173,8 +213,12 @@ export function SidebarContent({ role = "applicant" }: SidebarProps) {
             <Users className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-medium leading-none">{meta.userName}</span>
-            <span className="text-xs text-muted-foreground mt-1 capitalize">{role}</span>
+            <span className="text-sm font-medium leading-none">
+              {meta.userName}
+            </span>
+            <span className="text-xs text-muted-foreground mt-1 capitalize">
+              {role}
+            </span>
           </div>
         </div>
         <Button

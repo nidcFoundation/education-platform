@@ -1,19 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import type { LucideIcon } from "lucide-react";
+import {
+    ArrowRight,
+    CircleAlert,
+    CircleCheck,
+    GraduationCap,
+    Handshake,
+    Heart,
+    Lock,
+    Mail,
+    Phone,
+    Shield,
+    User,
+} from "lucide-react";
+import React from "react";
+import { toast } from "sonner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, Lock, Mail, Shield, User, Phone, Heart, Handshake, GraduationCap } from "lucide-react";
-import { nigerianStates } from "@/mock-data/applicant";
+import {
+    getDefaultRedirectPath,
+    getRoleForIntent,
+    isAuthIntent,
+    type AuthIntent,
+} from "@/lib/auth/roles";
+import { nigerianStates } from "@/lib/constants/nigeria";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
-type Intent = "applicant" | "donor" | "partner";
-
-const CONFIG: Record<Intent, { title: string; subtitle: string; cta: string; icon: any }> = {
+const CONFIG: Record<AuthIntent, { title: string; subtitle: string; cta: string; icon: LucideIcon }> = {
     applicant: {
         title: "Create Applicant Account",
         subtitle: "Start your application for education support and national impact.",
@@ -35,13 +56,109 @@ const CONFIG: Record<Intent, { title: string; subtitle: string; cta: string; ico
 };
 
 export default function SignupPage() {
+    const router = useRouter();
     const searchParams = useSearchParams();
-    const intentParam = searchParams.get("intent") as Intent;
-    const currentIntent = CONFIG[intentParam] ? intentParam : null;
+    const rawIntent = searchParams.get("intent");
+    const [stateOfOrigin, setStateOfOrigin] = React.useState("");
+    const [isSubmitting, setIsSubmitting] = React.useState(false);
+    const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
+
+    const currentIntent = isAuthIntent(rawIntent) ? rawIntent : null;
+
+    const handleSignup = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        if (!currentIntent) {
+            const msg = "Choose an account type before creating an account.";
+            setErrorMessage(msg);
+            toast.error(msg);
+            return;
+        }
+
+        const form = event.currentTarget;
+        const formData = new FormData(form);
+        const firstName = formData.get("firstName")?.toString().trim() ?? "";
+        const lastName = formData.get("lastName")?.toString().trim() ?? "";
+        const email = formData.get("email")?.toString().trim() ?? "";
+        const phone = formData.get("phone")?.toString().trim() ?? "";
+        const password = formData.get("password")?.toString() ?? "";
+        const confirmPassword = formData.get("confirmPassword")?.toString() ?? "";
+
+        if (password !== confirmPassword) {
+            const msg = "Passwords do not match.";
+            setErrorMessage(msg);
+            toast.error(msg);
+            return;
+        }
+
+        if (currentIntent === "applicant" && !stateOfOrigin) {
+            const msg = "Select your state of origin to continue.";
+            setErrorMessage(msg);
+            toast.error(msg);
+            return;
+        }
+
+        setIsSubmitting(true);
+        setErrorMessage(null);
+        setSuccessMessage(null);
+
+        try {
+            const role = getRoleForIntent(currentIntent);
+            const supabase = getSupabaseBrowserClient();
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        first_name: firstName,
+                        last_name: lastName,
+                        full_name: `${firstName} ${lastName}`.trim(),
+                        phone,
+                        state_of_origin: currentIntent === "applicant" ? stateOfOrigin : null,
+                        role,
+                        account_type: currentIntent,
+                    },
+                },
+            });
+
+            if (error) {
+                setErrorMessage(error.message);
+                toast.error("Signup failed", {
+                    description: error.message,
+                });
+                return;
+            }
+
+            if (data.session?.user) {
+                toast.success("Account created!", {
+                    description: "Welcome to the National Talent Initiative.",
+                });
+                router.replace(getDefaultRedirectPath(role));
+                router.refresh();
+                return;
+            }
+
+            form.reset();
+            setStateOfOrigin("");
+            const successText = "Account created. Check your email to confirm your address before signing in.";
+            setSuccessMessage(successText);
+            toast.success("Success!", {
+                description: successText,
+            });
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : "Unable to create your account right now.";
+            setErrorMessage(msg);
+            toast.error("Error", {
+                description: msg,
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     return (
         <div className="w-full max-w-lg py-8 mx-auto">
-            {/* Header */}
             <div className="text-center mb-8">
                 <Link href="/" className="inline-flex items-center gap-2 mb-6">
                     <div className="h-9 w-9 rounded bg-primary flex items-center justify-center">
@@ -59,8 +176,9 @@ export default function SignupPage() {
 
             {!currentIntent && (
                 <div className="grid grid-cols-3 gap-3 mb-8">
-                    {(Object.keys(CONFIG) as Intent[]).map((key) => {
+                    {(Object.keys(CONFIG) as AuthIntent[]).map((key) => {
                         const Icon = CONFIG[key].icon;
+
                         return (
                             <Link
                                 key={key}
@@ -80,73 +198,151 @@ export default function SignupPage() {
             )}
 
             <Card className={`border-border/60 shadow-sm transition-opacity duration-300 ${!currentIntent ? "opacity-50 pointer-events-none" : "opacity-100"}`}>
-                <CardContent className="p-6 space-y-5">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="first-name">First Name</Label>
-                            <div className="relative">
-                                <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input id="first-name" placeholder="Chukwuemeka" className="pl-9" />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="last-name">Last Name / Surname</Label>
-                            <Input id="last-name" placeholder="Okafor" />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="email">Email Address</Label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input id="email" type="email" placeholder="you@email.com" className="pl-9" />
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="phone">Phone Number</Label>
-                        <div className="relative">
-                            <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input id="phone" type="tel" placeholder="+234 803 xxx xxxx" className="pl-9" />
-                        </div>
-                    </div>
-
-                    {currentIntent === "applicant" && (
-                        <div className="space-y-2">
-                            <Label htmlFor="state">State of Origin</Label>
-                            <Select>
-                                <SelectTrigger id="state">
-                                    <SelectValue placeholder="Select your state of origin" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {nigerianStates.map((state) => (
-                                        <SelectItem key={state} value={state}>{state}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                <CardContent className="p-6">
+                    {errorMessage && (
+                        <Alert variant="destructive" className="mb-5">
+                            <CircleAlert />
+                            <AlertTitle>Signup failed</AlertTitle>
+                            <AlertDescription>{errorMessage}</AlertDescription>
+                        </Alert>
                     )}
 
-                    <div className="space-y-2">
-                        <Label htmlFor="password">Password</Label>
-                        <div className="relative">
-                            <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input id="password" type="password" placeholder="Minimum 8 characters" className="pl-9" />
+                    {successMessage && (
+                        <Alert className="mb-5">
+                            <CircleCheck />
+                            <AlertTitle>Verify your email</AlertTitle>
+                            <AlertDescription>{successMessage}</AlertDescription>
+                        </Alert>
+                    )}
+
+                    <form onSubmit={handleSignup} className="space-y-5">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="first-name">First Name</Label>
+                                <div className="relative">
+                                    <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        id="first-name"
+                                        name="firstName"
+                                        placeholder="Chukwuemeka"
+                                        className="pl-9"
+                                        autoComplete="given-name"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="last-name">Last Name / Surname</Label>
+                                <Input
+                                    id="last-name"
+                                    name="lastName"
+                                    placeholder="Okafor"
+                                    autoComplete="family-name"
+                                    required
+                                />
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="flex items-start gap-2 pt-1">
-                        <input type="checkbox" id="terms" className="mt-1 accent-primary" />
-                        <label htmlFor="terms" className="text-xs text-muted-foreground leading-relaxed">
-                            I confirm that all information I provide will be truthful. I understand that NTDI reserves the right to verify all submissions for security and compliance.
-                        </label>
-                    </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email Address</Label>
+                            <div className="relative">
+                                <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="email"
+                                    name="email"
+                                    type="email"
+                                    placeholder="you@email.com"
+                                    className="pl-9"
+                                    autoComplete="email"
+                                    required
+                                />
+                            </div>
+                        </div>
 
-                    <Button className="w-full h-10 font-semibold" disabled={!currentIntent}>
-                        {currentIntent ? CONFIG[currentIntent].cta : "Create Account"} <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
+                        <div className="space-y-2">
+                            <Label htmlFor="phone">Phone Number</Label>
+                            <div className="relative">
+                                <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="phone"
+                                    name="phone"
+                                    type="tel"
+                                    placeholder="+234 803 xxx xxxx"
+                                    className="pl-9"
+                                    autoComplete="tel"
+                                    required
+                                />
+                            </div>
+                        </div>
 
-                    <Separator />
+                        {currentIntent === "applicant" && (
+                            <div className="space-y-2">
+                                <Label htmlFor="state">State of Origin</Label>
+                                <Select value={stateOfOrigin} onValueChange={setStateOfOrigin}>
+                                    <SelectTrigger id="state">
+                                        <SelectValue placeholder="Select your state of origin" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {nigerianStates.map((state) => (
+                                            <SelectItem key={state} value={state}>
+                                                {state}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            <Label htmlFor="password">Password</Label>
+                            <div className="relative">
+                                <Lock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="password"
+                                    name="password"
+                                    type="password"
+                                    placeholder="Minimum 8 characters"
+                                    className="pl-9"
+                                    autoComplete="new-password"
+                                    minLength={8}
+                                    required
+                                />
+                            </div>
+                            <p className="text-[10px] text-muted-foreground px-1 ml-9">
+                                Use 8+ characters with a mix of letters and numbers.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="confirm-password">Confirm Password</Label>
+                            <div className="relative">
+                                <Shield className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="confirm-password"
+                                    name="confirmPassword"
+                                    type="password"
+                                    placeholder="Repeat your password"
+                                    className="pl-9"
+                                    autoComplete="new-password"
+                                    minLength={8}
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-2 pt-1">
+                            <input type="checkbox" id="terms" className="mt-1 accent-primary" required />
+                            <label htmlFor="terms" className="text-xs text-muted-foreground leading-relaxed">
+                                I confirm that all information I provide will be truthful. I understand that NTDI reserves the right to verify all submissions for security and compliance.
+                            </label>
+                        </div>
+
+                        <Button type="submit" className="w-full h-10 font-semibold" disabled={!currentIntent || isSubmitting}>
+                            {isSubmitting ? "Creating account..." : currentIntent ? CONFIG[currentIntent].cta : "Create Account"} <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                    </form>
+
+                    <Separator className="my-6" />
 
                     <div className="flex items-start gap-3 p-3 bg-muted/40 rounded-lg text-xs text-muted-foreground">
                         <Shield className="h-3.5 w-3.5 shrink-0 mt-0.5 text-primary" />
