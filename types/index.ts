@@ -272,6 +272,14 @@ export interface Notification {
     link?: string;
 }
 
+export interface Deadline {
+    id: string;
+    label: string;
+    date: string;
+    daysLeft: number;
+    isUrgent: boolean;
+}
+
 export interface Announcement {
     id: string;
     title: string;

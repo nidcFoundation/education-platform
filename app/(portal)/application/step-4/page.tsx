@@ -9,7 +9,7 @@ import {
     ArrowLeft, ArrowRight, Upload, CheckCircle2, Clock, XCircle, Trash2, FileText, Info, AlertCircle
 } from "lucide-react";
 import { applicationSteps, mockDocuments } from "@/mock-data/applicant";
-import type { DocumentType } from "@/types";
+import type { DocumentStatus, DocumentType } from "@/types";
 import Link from "next/link";
 
 const requiredDocuments: { type: DocumentType; label: string; description: string; required: boolean }[] = [
@@ -21,16 +21,18 @@ const requiredDocuments: { type: DocumentType; label: string; description: strin
     { type: "essay", label: "Statement of Purpose (Optional)", description: "Additional written statement not exceeding 2 pages — optional supplementary document.", required: false },
 ];
 
-const statusIcon = {
+const statusIcon: Record<DocumentStatus, React.ReactNode> = {
     verified: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
     pending: <Clock className="h-4 w-4 text-amber-500" />,
     rejected: <XCircle className="h-4 w-4 text-red-500" />,
+    expiring: <AlertCircle className="h-4 w-4 text-red-500" />,
 };
 
-const statusLabel = {
+const statusLabel: Record<DocumentStatus, string> = {
     verified: "Verified",
     pending: "Under Review",
     rejected: "Rejected",
+    expiring: "Expiring Soon",
 };
 
 function formatBytes(bytes: number) {

@@ -11,6 +11,7 @@ import type {
 
 export const mockApplicant: Applicant = {
     id: "app-001",
+    userId: "user-001",
     firstName: "Chukwuemeka",
     lastName: "Okafor",
     email: "c.okafor@email.com",
@@ -68,6 +69,7 @@ export const mockApplication: Application = {
 export const mockNotifications: Notification[] = [
     {
         id: "notif-1",
+        userId: "user-001",
         title: "Application Deadline Reminder",
         body: "Your application must be fully submitted by April 30, 2026. You are currently on Step 3 of 5.",
         type: "warning",
@@ -76,6 +78,7 @@ export const mockNotifications: Notification[] = [
     },
     {
         id: "notif-2",
+        userId: "user-001",
         title: "Document Verified",
         body: "Your WAEC Result (2021) has been successfully verified by our document team.",
         type: "success",
@@ -84,6 +87,7 @@ export const mockNotifications: Notification[] = [
     },
     {
         id: "notif-3",
+        userId: "user-001",
         title: "Welcome to the NTDI Applicant Portal",
         body: "Your account has been created successfully. Begin your application when you are ready.",
         type: "info",
@@ -92,6 +96,7 @@ export const mockNotifications: Notification[] = [
     },
     {
         id: "notif-4",
+        userId: "user-001",
         title: "Reference Letter Pending",
         body: "Your reference letter from Mr. Eze is still under review. Verification typically takes 2–3 working days.",
         type: "info",

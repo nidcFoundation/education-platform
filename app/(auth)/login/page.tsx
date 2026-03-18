@@ -2,20 +2,17 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, CircleAlert, Lock, Mail, Shield } from "lucide-react";
-import React from "react";
+import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ArrowRight, Eye, EyeOff, Lock, Mail, Shield } from "lucide-react";
+import { ArrowRight, CircleAlert, Lock, Mail, Shield } from "lucide-react";
 import { toast } from "sonner";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getDefaultRedirectPath, getRoleFromMetadata } from "@/lib/auth/roles";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
     const [email, setEmail] = useState("");
@@ -24,8 +21,8 @@ export default function LoginPage() {
     const [errorMessage, setErrorMessage] = useState("");
     const router = useRouter();
 
-    const handleSignIn = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSignIn = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
         setIsSubmitting(true);
         setErrorMessage("");
 
@@ -40,6 +37,15 @@ export default function LoginPage() {
                 setErrorMessage(error.message);
                 toast.error("Sign-in failed", {
                     description: error.message,
+                });
+                return;
+            }
+
+            if (!data.user) {
+                const message = "Your account was not returned after sign-in. Please try again.";
+                setErrorMessage(message);
+                toast.error("Sign-in failed", {
+                    description: message,
                 });
                 return;
             }
@@ -78,20 +84,13 @@ export default function LoginPage() {
 
             <Card className="border-border/60 shadow-sm">
                 <CardContent className="p-6 space-y-5">
-                    <div className="space-y-2">
-                        <Label htmlFor="email">Email Address</Label>
-                        <div className="relative">
-                            <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                id="email"
-                                type="email"
-                                placeholder="you@example.com"
-                                className="pl-9"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </div>
-                    </div>
+                    {errorMessage && (
+                        <Alert variant="destructive">
+                            <CircleAlert />
+                            <AlertTitle>Sign-in failed</AlertTitle>
+                            <AlertDescription>{errorMessage}</AlertDescription>
+                        </Alert>
+                    )}
 
                     <form onSubmit={handleSignIn} className="space-y-5">
                         <div className="space-y-2">
@@ -105,6 +104,8 @@ export default function LoginPage() {
                                     placeholder="you@example.com"
                                     className="pl-9"
                                     autoComplete="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
                                     required
                                 />
                             </div>
@@ -126,13 +127,16 @@ export default function LoginPage() {
                                     placeholder="••••••••"
                                     className="pl-9"
                                     autoComplete="current-password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
                                     required
                                 />
                             </div>
                         </div>
 
                         <Button type="submit" className="w-full h-10 font-semibold mt-2" disabled={isSubmitting}>
-                            {isSubmitting ? "Signing in..." : "Sign In to Portal"} <ArrowRight className="ml-2 h-4 w-4" />
+                            {isSubmitting ? "Signing in..." : "Sign In to Portal"}
+                            <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
                     </form>
 
