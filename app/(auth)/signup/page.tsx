@@ -16,7 +16,7 @@ import {
     Shield,
     User,
 } from "lucide-react";
-import React from "react";
+import React, { Suspense } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -55,7 +55,7 @@ const CONFIG: Record<AuthIntent, { title: string; subtitle: string; cta: string;
     },
 };
 
-export default function SignupPage() {
+function SignupPageContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const rawIntent = searchParams.get("intent");
@@ -358,5 +358,13 @@ export default function SignupPage() {
                 </Link>
             </p>
         </div>
+    );
+}
+
+export default function SignupPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]">Loading signup...</div>}>
+            <SignupPageContent />
+        </Suspense>
     );
 }

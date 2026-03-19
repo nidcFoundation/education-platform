@@ -119,6 +119,7 @@ export const mockAnnouncements: Announcement[] = [
         author: "NTDI Programme Office",
         createdAt: "2026-03-10",
         isPinned: true,
+        audience: "applicants",
     },
     {
         id: "ann-2",
@@ -127,6 +128,7 @@ export const mockAnnouncements: Announcement[] = [
         author: "NTDI Applications Team",
         createdAt: "2026-03-05",
         isPinned: false,
+        audience: "applicants",
     },
     {
         id: "ann-3",
@@ -135,6 +137,7 @@ export const mockAnnouncements: Announcement[] = [
         author: "NTDI Programme Office",
         createdAt: "2026-02-28",
         isPinned: false,
+        audience: "all",
     },
 ];
 
