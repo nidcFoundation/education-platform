@@ -15,7 +15,7 @@ import { ArrowRight, Banknote, BarChart3, Briefcase, GraduationCap, Target, User
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getDonorDashboardData } from "@/lib/supabase/actions";
 import { redirect } from "next/navigation";
-import { programGrowth, sectorPlacementBreakdown } from "@/mock-data/donor";
+import { programGrowth, sectorPlacementBreakdown } from "@/lib/constants";
 
 const dashboardIcons = [
     Users,
@@ -61,7 +61,7 @@ export default async function DonorDashboardPage() {
     ];
 
     const fundDistribution = fundingRecords.map((f: any) => ({
-        label: f.category,
+        label: f.category || f.programs?.name || "Allocation",
         value: Number(f.amount),
         color: `hsl(var(--primary) / ${0.4 + Math.random() * 0.6})`
     }));
@@ -94,20 +94,20 @@ export default async function DonorDashboardPage() {
                             <div className="space-y-5">
                                 <div>
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <h2 className="text-2xl font-semibold tracking-tight">{profile?.organization || "Donor Organization"}</h2>
+                                        <h2 className="text-2xl font-semibold tracking-tight">{profile?.category || "Donor Organization"}</h2>
                                         <Badge variant="secondary">Active Donor</Badge>
-                                        <Badge variant="outline">{profile?.donor_id || "DNR-Pending"}</Badge>
+                                        <Badge variant="outline">{profile?.id?.slice(0, 8) || "DNR-Pending"}</Badge>
                                     </div>
                                     <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-                                        {profile?.bio || "No description provided."}
+                                        Focus: {profile?.investment_focus || "General national development support."}
                                     </p>
                                 </div>
 
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <div className="rounded-xl border bg-background/85 p-4">
-                                        <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Commitment Window</p>
-                                        <p className="mt-2 font-semibold">2024 - 2028</p>
-                                        <p className="mt-1 text-sm text-muted-foreground">Relationship manager: Support Team</p>
+                                        <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Reporting Cadence</p>
+                                        <p className="mt-2 font-semibold">{profile?.reporting_cadence || "Quarterly"}</p>
+                                        <p className="mt-1 text-sm text-muted-foreground">Next renewal: {profile?.renewal_window || "Standard cycle"}</p>
                                     </div>
                                     <div className="rounded-xl border bg-background/85 p-4">
                                         <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Total Commitment</p>
@@ -226,17 +226,17 @@ export default async function DonorDashboardPage() {
                         {sponsoredScholars.map((scholar: any) => (
                             <div key={scholar.id} className="rounded-xl border bg-background p-4">
                                 <div className="flex items-start gap-3">
-                                    <Avatar size="lg" className="h-12 w-12">
-                                        <AvatarFallback className="bg-primary/12 font-semibold text-primary">
+                                    <Avatar className="h-12 w-12">
+                                        <AvatarFallback className="bg-primary/10 font-semibold text-primary">
                                             {scholar.first_name[0]}{scholar.last_name[0]}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div className="flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
                                             <p className="font-semibold">{scholar.first_name} {scholar.last_name}</p>
-                                            <Badge variant="outline">Cohort {scholar.cohort}</Badge>
+                                            <Badge variant="outline">Cohort {scholar.cohort || "2026"}</Badge>
                                         </div>
-                                        <p className="text-sm text-muted-foreground">{scholar.program} · {scholar.institution}</p>
+                                        <p className="text-sm text-muted-foreground">{scholar.program || "Technology Track"} · {scholar.institution || "NTDI Academy"}</p>
                                     </div>
                                     <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
                                         {scholar.progress_score >= 80 ? "Excellent" : scholar.progress_score >= 60 ? "On Track" : "Needs Review"}
@@ -251,11 +251,11 @@ export default async function DonorDashboardPage() {
                                     <Progress value={scholar.progress_score || 0} className="h-2" />
                                 </div>
 
-                                <p className="mt-4 text-sm text-muted-foreground">{scholar.bio?.slice(0, 100)}...</p>
+                                <p className="mt-4 text-sm text-muted-foreground">{scholar.bio?.slice(0, 100) || "Progressing well across all academic tracks and career readiness modules."}...</p>
                             </div>
                         ))}
                         {sponsoredScholars.length === 0 && (
-                            <p className="text-sm text-muted-foreground">No sponsored scholars yet.</p>
+                            <p className="text-sm text-muted-foreground p-8 text-center border rounded-xl bg-muted/5">No sponsored scholars yet. Your scholarship allocations will appear here once finalized.</p>
                         )}
                     </CardContent>
                 </Card>

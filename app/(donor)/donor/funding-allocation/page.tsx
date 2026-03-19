@@ -1,14 +1,9 @@
-"use client";
-
-import { useState } from "react";
 import {
     DonutBreakdownChart,
     HorizontalBarChart,
 } from "@/components/donor/transparency-charts";
 import { PageContainer } from "@/components/layout/page-container";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Table,
@@ -18,72 +13,51 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { AlertCircle, Banknote, Target } from "lucide-react";
-import {
-    cohortSuccessRates,
-    fundDistribution,
-    impactMetrics,
-    scholarFundingBreakdown,
-    sectorPlacementBreakdown,
-    sponsoredScholars,
-} from "@/mock-data/donor";
+import { Banknote, Target } from "lucide-react";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getDonorDashboardData } from "@/lib/supabase/actions";
+import { redirect } from "next/navigation";
+import { sectorPlacementBreakdown } from "@/lib/constants";
+import { DownloadButton } from "@/components/donor/download-button";
 
-function getFilenameFromDisposition(contentDisposition: string | null) {
-    const match = contentDisposition?.match(/filename="?([^"]+)"?/i);
-    return match?.[1] ?? "allocation-summary.txt";
-}
+export default async function FundingAllocationPage() {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-export default function FundingAllocationPage() {
-    const [isDownloading, setIsDownloading] = useState(false);
-    const [downloadError, setDownloadError] = useState<string | null>(null);
-
-    async function downloadAllocationSummary() {
-        setIsDownloading(true);
-        setDownloadError(null);
-
-        try {
-            const response = await fetch("/api/donor/allocation-summary");
-
-            if (!response.ok) {
-                throw new Error("Unable to download the allocation summary right now.");
-            }
-
-            const blob = await response.blob();
-            const downloadUrl = window.URL.createObjectURL(blob);
-            const link = document.createElement("a");
-
-            link.href = downloadUrl;
-            link.download = getFilenameFromDisposition(response.headers.get("content-disposition"));
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(downloadUrl);
-        } catch (error) {
-            setDownloadError(error instanceof Error ? error.message : "Unable to download the allocation summary right now.");
-        } finally {
-            setIsDownloading(false);
-        }
+    if (!user) {
+        redirect("/login");
     }
+
+    const { profile, fundingRecords, sponsoredScholars, impactMetrics } = await getDonorDashboardData(user.id);
+
+    const totalAllocated = fundingRecords.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
+    const fundDistribution = fundingRecords.map((r, i) => ({
+        label: r.programs?.name || "Support Line",
+        value: r.amount || 0,
+        color: ["#0f766e", "#0284c7", "#d97706", "#dc2626"][i % 4]
+    }));
+
+    const scholarFundingBreakdown = [
+        { label: "Tuition & Fees", value: 65, color: "var(--primary)" },
+        { label: "Monthly Stipend", value: 20, color: "#0284c7" },
+        { label: "Research Lab Access", value: 10, color: "#d97706" },
+        { label: "Career Mentorship", value: 5, color: "#475569" },
+    ];
+
+    const cohortSuccessRates = [
+        { cohort: "2023", retention: 98, graduation: 96, placement: 92 },
+        { cohort: "2024", retention: 100, graduation: 0, placement: 0 },
+        { cohort: "2025", retention: 100, graduation: 0, placement: 0 },
+    ];
 
     return (
         <PageContainer
             title="Funding Allocation"
             description="A transparent view of allocation tracking, scholar support, and the outcomes your funding is enabling."
-            action={
-                <Button onClick={downloadAllocationSummary} disabled={isDownloading} aria-busy={isDownloading}>
-                    Download Allocation Summary
-                </Button>
-            }
+            action={<DownloadButton />}
         >
             <div className="space-y-6">
-                {downloadError && (
-                    <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Download failed</AlertTitle>
-                        <AlertDescription>{downloadError}</AlertDescription>
-                    </Alert>
-                )}
-
                 <div className="grid gap-6 xl:grid-cols-2">
                     <Card className="border-border/60">
                         <CardHeader>
@@ -94,7 +68,11 @@ export default function FundingAllocationPage() {
                             <CardDescription>Where donor resources are being deployed across the scholar journey.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <DonutBreakdownChart items={fundDistribution} totalLabel="Allocated" totalValue="₦18.5M" />
+                            <DonutBreakdownChart
+                                items={fundDistribution}
+                                totalLabel="Allocated"
+                                totalValue={`₦${(totalAllocated / 1000000).toFixed(1)}M`}
+                            />
                         </CardContent>
                     </Card>
 
@@ -121,23 +99,28 @@ export default function FundingAllocationPage() {
                                     <TableRow>
                                         <TableHead>Scholar</TableHead>
                                         <TableHead>Program</TableHead>
-                                        <TableHead>Allocated</TableHead>
-                                        <TableHead>Used</TableHead>
+                                        <TableHead>Status</TableHead>
                                         <TableHead>Progress</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {sponsoredScholars.map((scholar) => (
+                                    {sponsoredScholars.map((scholar: any) => (
                                         <TableRow key={scholar.id}>
-                                            <TableCell className="font-medium">{scholar.name}</TableCell>
-                                            <TableCell>{scholar.program}</TableCell>
-                                            <TableCell>{scholar.allocation}</TableCell>
-                                            <TableCell>{scholar.used}</TableCell>
+                                            <TableCell className="font-medium">{scholar.first_name} {scholar.last_name}</TableCell>
+                                            <TableCell>{scholar.program || "Tech Track"}</TableCell>
+                                            <TableCell className="capitalize">{scholar.status || "active"}</TableCell>
                                             <TableCell>
-                                                <Badge variant="outline">{scholar.progressScore}%</Badge>
+                                                <Badge variant="outline">{scholar.progress_score || 0}%</Badge>
                                             </TableCell>
                                         </TableRow>
                                     ))}
+                                    {sponsoredScholars.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="text-center py-6 text-muted-foreground text-sm">
+                                                No sponsored scholars assigned.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
                                 </TableBody>
                             </Table>
                         </CardContent>
@@ -149,8 +132,8 @@ export default function FundingAllocationPage() {
                             <CardDescription>Key performance and development outcomes tied to the funding portfolio.</CardDescription>
                         </CardHeader>
                         <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-                            {impactMetrics.map((metric) => (
-                                <div key={metric.label} className="rounded-xl border bg-muted/20 p-4">
+                            {impactMetrics.map((metric: any) => (
+                                <div key={metric.id} className="rounded-xl border bg-muted/20 p-4">
                                     <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{metric.label}</p>
                                     <p className="mt-2 text-2xl font-bold tracking-tight">{metric.value}</p>
                                     <p className="mt-1 text-sm text-muted-foreground">{metric.description}</p>

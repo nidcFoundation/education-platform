@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowRight, Calendar, Clock, Search } from "lucide-react";
-import { mockNews } from "@/mock-data";
+import { getPublicHomeData } from "@/lib/supabase/actions";
 import Link from "next/link";
 
 const categoryColorMap: Record<string, string> = {
@@ -16,9 +16,23 @@ const categoryColorMap: Record<string, string> = {
     "Achievement": "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-400",
 };
 
-export default function NewsPage() {
-    const featured = mockNews[0];
-    const rest = mockNews.slice(1);
+export default async function NewsPage() {
+    const { news } = await getPublicHomeData();
+
+    if (news.length === 0) {
+        return (
+            <div className="flex flex-col w-full min-h-[60vh] items-center justify-center p-8">
+                <h1 className="text-2xl font-bold mb-2">No News Yet</h1>
+                <p className="text-muted-foreground">Check back later for updates from the Initiative.</p>
+                <Link href="/" className="mt-4">
+                    <Button variant="outline">Back to Home</Button>
+                </Link>
+            </div>
+        );
+    }
+
+    const featured = news[0];
+    const rest = news.slice(1);
 
     return (
         <div className="flex flex-col w-full">
@@ -43,21 +57,21 @@ export default function NewsPage() {
                     <div className="grid md:grid-cols-2">
                         <div className="aspect-video md:aspect-auto bg-muted/80 relative flex items-center justify-center">
                             <div className="text-muted-foreground/20 text-8xl font-black">
-                                {featured.category[0]}
+                                {featured.priority[0]}
                             </div>
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                            <Badge className={`absolute top-4 left-4 ${categoryColorMap[featured.category] ?? ""}`} variant="outline">
-                                {featured.category}
+                            <div className="absolute inset-0 bg-linear-to-t from-black/20 to-transparent" />
+                            <Badge className={`absolute top-4 left-4 bg-primary/10 text-primary border-primary/20`} variant="outline">
+                                {featured.audience} Update
                             </Badge>
                         </div>
                         <div className="flex flex-col justify-between p-8 md:p-10">
                             <div className="space-y-4">
                                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                                    <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{featured.date}</span>
-                                    <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" />{featured.readTime}</span>
+                                    <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" />{new Date(featured.created_at).toLocaleDateString()}</span>
+                                    <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" />5 min read</span>
                                 </div>
                                 <h2 className="text-2xl md:text-3xl font-bold leading-tight">{featured.title}</h2>
-                                <p className="text-muted-foreground leading-relaxed">{featured.excerpt}</p>
+                                <p className="text-muted-foreground leading-relaxed">{featured.summary}</p>
                             </div>
                             <div className="mt-8">
                                 <Button className="group">
@@ -72,40 +86,27 @@ export default function NewsPage() {
 
             {/* All Articles by Category */}
             <SectionWrapper title="Latest Articles" className="bg-muted/20 border-t">
-                {/* Category Filter */}
-                <div className="flex flex-wrap gap-2 mt-4 mb-8">
-                    {["All", ...Array.from(new Set(mockNews.map(n => n.category)))].map((cat, i) => (
-                        <Button
-                            key={i}
-                            variant={i === 0 ? "default" : "secondary"}
-                            size="sm"
-                            className="rounded-full text-xs h-7"
-                        >
-                            {cat}
-                        </Button>
-                    ))}
-                </div>
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
                     {rest.map((article) => (
                         <Card key={article.id} className="flex flex-col border-border/50 hover:border-primary/40 transition-colors overflow-hidden">
                             <div className="aspect-video bg-muted/60 relative flex items-center justify-center">
-                                <div className="text-muted-foreground/20 text-7xl font-black">{article.category[0]}</div>
+                                <div className="text-muted-foreground/20 text-7xl font-black">{article.priority[0]}</div>
                                 <Badge
-                                    className={`absolute top-3 left-3 text-xs ${categoryColorMap[article.category] ?? ""}`}
+                                    className={`absolute top-3 left-3 text-xs bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400`}
                                     variant="outline"
                                 >
-                                    {article.category}
+                                    {article.priority} Priority
                                 </Badge>
                             </div>
                             <CardHeader className="pb-2">
                                 <div className="flex items-center gap-3 text-xs text-muted-foreground mb-2">
-                                    <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{article.date}</span>
-                                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{article.readTime}</span>
+                                    <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(article.created_at).toLocaleDateString()}</span>
+                                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />4 min read</span>
                                 </div>
                                 <CardTitle className="text-base leading-snug line-clamp-2">{article.title}</CardTitle>
                             </CardHeader>
                             <CardContent className="flex-1">
-                                <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">{article.excerpt}</p>
+                                <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">{article.summary}</p>
                             </CardContent>
                             <CardFooter className="pt-0">
                                 <Button variant="ghost" className="p-0 h-auto text-primary text-sm font-medium hover:bg-transparent">
@@ -114,9 +115,9 @@ export default function NewsPage() {
                             </CardFooter>
                         </Card>
                     ))}
-                </div>
-                <div className="mt-12 text-center">
-                    <Button variant="outline" size="lg">Load More Articles</Button>
+                    {rest.length === 0 && (
+                        <p className="col-span-full text-center text-muted-foreground py-12">No additional news articles found.</p>
+                    )}
                 </div>
             </SectionWrapper>
 

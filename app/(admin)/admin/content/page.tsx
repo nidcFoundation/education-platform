@@ -19,7 +19,7 @@ import { CalendarRange, FilePenLine, LayoutTemplate, Send } from "lucide-react";
 import {
     adminContentItems,
     contentStatusBreakdown,
-} from "@/mock-data/admin";
+} from "@/lib/constants";
 
 const contentMetrics = [
     { title: "Content Assets", value: "258", description: "Live, scheduled, and draft assets tracked", icon: LayoutTemplate },

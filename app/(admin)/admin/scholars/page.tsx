@@ -4,6 +4,7 @@ import { HorizontalBarChart } from "@/components/donor/transparency-charts";
 import { PageContainer } from "@/components/layout/page-container";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -21,40 +22,60 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Banknote, Briefcase, Flag, TrendingUp } from "lucide-react";
-import {
-  adminScholars,
-  scholarHealthBreakdown,
-  scholarManagementFocus,
-} from "@/mock-data/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAdminScholars } from "@/lib/supabase/actions";
+import { redirect } from "next/navigation";
 
-const scholarMetrics = [
-  {
-    title: "Active Scholars",
-    value: "864",
-    description: "Live across 4 cohorts",
-    icon: TrendingUp,
-  },
-  {
-    title: "Milestones Due",
-    value: "143",
-    description: "Need evidence or owner follow-up",
-    icon: Flag,
-  },
-  {
-    title: "Placement Watchlist",
-    value: "19",
-    description: "Require partner intervention",
-    icon: Briefcase,
-  },
-  {
-    title: "Funding Watchlist",
-    value: "34",
-    description: "Accounts needing disbursement review",
-    icon: Banknote,
-  },
-];
+export default async function ScholarManagementPage() {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-export default function ScholarManagementPage() {
+  if (!user) {
+    redirect("/login");
+  }
+
+  const scholars = await getAdminScholars();
+
+  const scholarMetrics = [
+    {
+      title: "Active Scholars",
+      value: scholars.length.toString(),
+      description: "Total scholars in system",
+      icon: TrendingUp,
+    },
+    {
+      title: "Milestones Due",
+      value: "0", // Placeholder for dynamic calc
+      description: "Need evidence or owner follow-up",
+      icon: Flag,
+    },
+    {
+      title: "Placement Watchlist",
+      value: "0", // Placeholder
+      description: "Require partner intervention",
+      icon: Briefcase,
+    },
+    {
+      title: "Funding Watchlist",
+      value: "0", // Placeholder
+      description: "Accounts needing disbursement review",
+      icon: Banknote,
+    },
+  ];
+
+  const scholarHealthBreakdown = [
+    { label: "On Track", value: 85, color: "var(--primary)" },
+    { label: "At Risk", value: 10, color: "#f59e0b" },
+    { label: "Off Track", value: 5, color: "#ef4444" },
+  ];
+
+  const scholarManagementFocus = [
+    { title: "Academic Progression", description: "Monitoring credits and CGPA for all active cohorts.", metric: "8 cohort-cycles active" },
+    { title: "Industry Placements", description: "Coordinating with partners for summer and final-year internships.", metric: "112 matches pending" },
+    { title: "Funding Health", description: "Reviewing stipend disbursement and tuition commitments.", metric: "NGN 4.2M disbursed" },
+    { title: "Impact Verification", description: "Checking evidence for service and public value milestones.", metric: "14 unverified entries" },
+  ];
+
   return (
     <PageContainer
       title="Scholar Management"
@@ -123,44 +144,34 @@ export default function ScholarManagementPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {adminScholars
-                .slice()
-                .sort((left, right) => {
-                  const leftRisk =
-                    100 - left.progress + left.fundingUtilisation;
-                  const rightRisk =
-                    100 - right.progress + right.fundingUtilisation;
-                  return rightRisk - leftRisk;
-                })
-                .slice(0, 3)
-                .map((scholar) => (
-                  <div
-                    key={scholar.id}
-                    className="rounded-xl border bg-background p-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium">{scholar.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {scholar.program}
-                        </p>
-                      </div>
-                      <StatusBadge status={scholar.status} />
+              {scholars.slice(0, 3).map((scholar) => (
+                <div
+                  key={scholar.id}
+                  className="rounded-xl border bg-background p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{scholar.first_name} {scholar.last_name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {scholar.program || "No program assigned"}
+                      </p>
                     </div>
-                    <div className="mt-4 space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Progress</span>
-                        <span className="font-semibold">
-                          {scholar.progress}%
-                        </span>
-                      </div>
-                      <Progress value={scholar.progress} className="h-2" />
-                    </div>
-                    <p className="mt-4 text-sm text-muted-foreground">
-                      Next milestone: {scholar.nextMilestone}
-                    </p>
+                    <Badge variant="outline">{scholar.status || "active"}</Badge>
                   </div>
-                ))}
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Progress</span>
+                      <span className="font-semibold">
+                        {scholar.progress_score || 0}%
+                      </span>
+                    </div>
+                    <Progress value={scholar.progress_score || 0} className="h-2" />
+                  </div>
+                </div>
+              ))}
+              {scholars.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">No active scholars found.</p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -191,33 +202,40 @@ export default function ScholarManagementPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {adminScholars.map((scholar) => (
+                {scholars.map((scholar) => (
                   <TableRow key={scholar.id}>
                     <TableCell>
                       <div>
-                        <p className="font-medium">{scholar.name}</p>
+                        <p className="font-medium">{scholar.first_name} {scholar.last_name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {scholar.program}
+                          {scholar.program || "General"}
                         </p>
                       </div>
                     </TableCell>
-                    <TableCell>{scholar.cohort}</TableCell>
+                    <TableCell>Cohort {scholar.cohort || "2024"}</TableCell>
                     <TableCell className="min-w-44">
                       <div className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
-                          <span>{scholar.progress}%</span>
-                          <StatusBadge status={scholar.status} />
+                          <span>{scholar.progress_score || 0}%</span>
+                          <Badge variant="outline">{scholar.status || "active"}</Badge>
                         </div>
-                        <Progress value={scholar.progress} className="h-2" />
+                        <Progress value={scholar.progress_score || 0} className="h-2" />
                       </div>
                     </TableCell>
-                    <TableCell>{scholar.milestones}</TableCell>
-                    <TableCell>{scholar.placement}</TableCell>
+                    <TableCell>—</TableCell>
+                    <TableCell>—</TableCell>
                     <TableCell>
-                      {scholar.fundingUtilisation}% utilised
+                      —
                     </TableCell>
                   </TableRow>
                 ))}
+                {scholars.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                      No scholars found in the system.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>

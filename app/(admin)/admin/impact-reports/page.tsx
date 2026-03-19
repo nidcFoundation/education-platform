@@ -16,7 +16,7 @@ import { BookMarked, ChartColumn, FileCheck2, FileText } from "lucide-react";
 import {
     adminImpactReports,
     reportCoverageBreakdown,
-} from "@/mock-data/impact-reports";
+} from "@/lib/constants";
 
 const impactMetrics = [
     { title: "Active Reports", value: "4", description: "In production, review, or published", icon: FileText },

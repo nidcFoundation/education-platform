@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Search, Trophy, MapPin, Briefcase, GraduationCap, Quote } from "lucide-react";
-import { mockScholars } from "@/mock-data";
+import { getPublicScholars } from "@/lib/supabase/actions";
 import Link from "next/link";
 
 const cohorts = ["All", "2023", "2024", "2025"];
@@ -37,7 +37,9 @@ const statusColorMap: Record<string, string> = {
     suspended: "bg-red-100 text-red-800 border-red-200",
 };
 
-export default function ScholarsPage() {
+export default async function ScholarsPage() {
+    const scholars = await getPublicScholars();
+
     return (
         <div className="flex flex-col w-full">
             {/* Hero */}
@@ -49,7 +51,7 @@ export default function ScholarsPage() {
                     </p>
                     <div className="flex justify-center gap-4 flex-wrap pt-2 text-sm">
                         <div className="text-center">
-                            <div className="text-2xl font-bold">1,250+</div>
+                            <div className="text-2xl font-bold">{scholars.length.toLocaleString()}+</div>
                             <div className="text-muted-foreground text-xs">Total Scholars</div>
                         </div>
                         <div className="w-px h-10 bg-border self-center" />
@@ -114,52 +116,43 @@ export default function ScholarsPage() {
                         {cohorts.map((c, i) => (
                             <Button key={i} variant={i === 0 ? "default" : "secondary"} size="sm" className="rounded-full text-xs h-7">{c}</Button>
                         ))}
-                        <span className="text-xs font-semibold text-muted-foreground self-center ml-4 mr-2 uppercase tracking-wider">Discipline:</span>
-                        {disciplines.slice(0, 3).map((d, i) => (
-                            <Button key={i} variant="secondary" size="sm" className="rounded-full text-xs h-7">{d}</Button>
-                        ))}
                     </div>
                 </div>
 
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                    {mockScholars.map((scholar) => (
+                    {scholars.map((scholar) => (
                         <Card key={scholar.id} className="overflow-hidden border-border/50 hover:border-primary/50 transition-colors">
                             <div className="aspect-square bg-muted relative">
                                 <div className="absolute inset-0 flex items-center justify-center bg-primary/5 font-bold text-4xl text-primary/20">
-                                    {scholar.name.charAt(0)}{scholar.name.split(" ")[1].charAt(0)}
+                                    {scholar.first_name?.[0]}{scholar.last_name?.[0]}
                                 </div>
                                 <div className="absolute top-3 right-3">
-                                    <Badge variant="outline" className={`text-xs ${statusColorMap[scholar.status] ?? ""}`}>{scholar.cohort}</Badge>
+                                    <Badge variant="outline" className={`text-xs ${statusColorMap[scholar.status] ?? ""}`}>2025</Badge>
                                 </div>
                             </div>
                             <CardContent className="p-4">
-                                <h3 className="font-bold text-base mb-0.5 truncate">{scholar.name}</h3>
-                                <Badge variant="outline" className={`text-[10px] mb-3 capitalize ${statusColorMap[scholar.status] ?? ""}`}>{scholar.status}</Badge>
+                                <h3 className="font-bold text-base mb-0.5 truncate">{scholar.first_name} {scholar.last_name}</h3>
+                                <Badge variant="outline" className={`text-[10px] mb-3 capitalize bg-emerald-100 text-emerald-800 border-emerald-200`}>Scholar</Badge>
                                 <div className="space-y-2 text-xs text-muted-foreground">
                                     <div className="flex items-center gap-1.5">
                                         <Trophy className="h-3.5 w-3.5 shrink-0" />
-                                        <span className="truncate">{scholar.discipline}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <GraduationCap className="h-3.5 w-3.5 shrink-0" />
-                                        <span className="truncate">{scholar.institution}</span>
+                                        <span className="truncate">STEM Leadership</span>
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                         <MapPin className="h-3.5 w-3.5 shrink-0" />
-                                        <span>{scholar.state} State</span>
+                                        <span>{scholar.state_of_origin || "Lagos"} State</span>
                                     </div>
                                     <div className="flex items-center gap-1.5 pt-1 border-t">
                                         <Briefcase className="h-3.5 w-3.5 shrink-0" />
-                                        <span className="text-primary font-medium truncate">{scholar.placement}</span>
+                                        <span className="text-primary font-medium truncate">Candidate</span>
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
                     ))}
-                </div>
-
-                <div className="mt-10 text-center">
-                    <Button variant="outline" size="lg">Load More Scholars</Button>
+                    {scholars.length === 0 && (
+                        <p className="col-span-full text-center text-muted-foreground py-12">No scholars found.</p>
+                    )}
                 </div>
             </SectionWrapper>
 

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import {
     adminSystemSettings,
     type SettingToggle,
-} from "@/mock-data/admin";
+} from "@/lib/constants";
 import { Settings2 } from "lucide-react";
 
 function ToggleGroup({

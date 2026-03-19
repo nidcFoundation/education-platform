@@ -12,65 +12,82 @@ import {
     Calendar,
     CheckCircle2,
     Clock,
-    FileText,
     MessageSquare,
     Pin,
     AlertTriangle,
 } from "lucide-react";
-import {
-    mockApplicant,
-    mockApplication,
-    mockNotifications,
-    mockDeadlines,
-    mockAnnouncements,
-    applicationSteps,
-} from "@/mock-data/applicant";
+import { redirect } from "next/navigation";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getApplicantDashboardData } from "@/lib/supabase/actions";
+import { buildProfileFallback } from "@/lib/auth/profile-fallback";
 
-// Profile completion calculation
-const profileCompleted = [
-    !!mockApplication.personalInfo?.firstName,
-    !!mockApplication.academicBackground?.secondarySchool,
-    !!mockApplication.essays?.whyApply,
-    (mockApplication.documents?.length ?? 0) > 0,
+const applicationSteps = [
+    { step: 1, label: "Personal Information" },
+    { step: 2, label: "Academic Background" },
+    { step: 3, label: "Essays" },
+    { step: 4, label: "Documents" },
+    { step: 5, label: "Review & Submit" },
 ];
-const completionPct = Math.round((profileCompleted.filter(Boolean).length / 5) * 100);
-const unreadNotifs = mockNotifications.filter((n) => !n.isRead).length;
 
-export default function ApplicantDashboard() {
+type ApplicantDashboardData = Awaited<ReturnType<typeof getApplicantDashboardData>>;
+type ApplicantAnnouncement = ApplicantDashboardData["announcements"][number];
+type ApplicantNotification = ApplicantDashboardData["notifications"][number];
+type ApplicantDeadline = ApplicantDashboardData["deadlines"][number];
+
+export default async function ApplicantDashboard() {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        redirect("/login");
+    }
+
+    const {
+        profile,
+        application,
+        announcements,
+        notifications,
+        deadlines
+    } = await getApplicantDashboardData(user.id);
+    const resolvedProfile = profile ?? buildProfileFallback(user);
+
+    // Profile completion calculation (mock logic simplified for dynamic data)
+    const currentStep = application?.step || 1;
+    const completionPct = Math.round((currentStep / applicationSteps.length) * 100);
+    const unreadNotifs = notifications.filter((n: ApplicantNotification) => !n.is_read).length;
+
     return (
         <PageContainer
-            title={`Welcome back, ${mockApplicant.firstName}`}
-            description={`Application ID: ${mockApplication.id} · Programme: ${mockApplication.programChoice}`}
+            title={`Welcome back, ${resolvedProfile.first_name}`}
+            description={application ? `Application ID: ${application.id.slice(0, 8)}... · Status: ${application.status}` : "Start your journey today."}
             action={
-                <Link href="/portal/apply">
+                <Link href="/application">
                     <Button className="font-semibold">
-                        Continue Application <ArrowRight className="ml-2 h-4 w-4" />
+                        {application ? "Continue Application" : "Start Application"} <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                 </Link>
             }
         >
             <div className="grid gap-6 lg:grid-cols-3">
-                {/* Left Column: Application Summary + Steps */}
                 <div className="lg:col-span-2 space-y-6">
-                    {/* Application Progress Card */}
                     <Card className="border-border/50">
                         <CardHeader className="pb-2 flex flex-row items-start justify-between gap-4">
                             <div>
                                 <CardTitle className="text-base font-semibold">Application Progress</CardTitle>
                                 <p className="text-sm text-muted-foreground mt-0.5">
-                                    Step {mockApplication.currentStep} of {applicationSteps.length} — {applicationSteps[mockApplication.currentStep - 1]?.label}
+                                    Step {currentStep} of {applicationSteps.length} — {applicationSteps[currentStep - 1]?.label}
                                 </p>
                             </div>
-                            <ApplicationStatusBadge status={mockApplication.status} />
+                            {application && <ApplicationStatusBadge status={application.status} />}
                         </CardHeader>
                         <CardContent className="space-y-5">
-                            <Progress value={(mockApplication.currentStep / applicationSteps.length) * 100} className="h-2" />
+                            <Progress value={(currentStep / applicationSteps.length) * 100} className="h-2" />
 
                             <div className="space-y-2">
                                 {applicationSteps.map((s) => {
-                                    const isCompleted = s.step < mockApplication.currentStep;
-                                    const isActive = s.step === mockApplication.currentStep;
-                                    const isPending = s.step > mockApplication.currentStep;
+                                    const isCompleted = s.step < currentStep;
+                                    const isActive = s.step === currentStep;
+                                    const isPending = s.step > currentStep;
                                     return (
                                         <div
                                             key={s.step}
@@ -78,8 +95,8 @@ export default function ApplicantDashboard() {
                                                 }`}
                                         >
                                             <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isCompleted ? "bg-primary text-primary-foreground" :
-                                                    isActive ? "border-2 border-primary text-primary bg-background" :
-                                                        "border border-muted-foreground/30 text-muted-foreground/50 bg-muted/30"
+                                                isActive ? "border-2 border-primary text-primary bg-background" :
+                                                    "border border-muted-foreground/30 text-muted-foreground/50 bg-muted/30"
                                                 }`}>
                                                 {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : s.step}
                                             </div>
@@ -90,7 +107,7 @@ export default function ApplicantDashboard() {
                                                 {isPending && <p className="text-xs text-muted-foreground/60 mt-0.5">Not started</p>}
                                             </div>
                                             {isActive && (
-                                                <Link href={`/portal/apply/step-${s.step}`}>
+                                                <Link href={`/application/step-${s.step}`}>
                                                     <Button size="sm" variant="outline" className="text-xs h-7 shrink-0">Continue</Button>
                                                 </Link>
                                             )}
@@ -99,16 +116,17 @@ export default function ApplicantDashboard() {
                                 })}
                             </div>
 
-                            <div className="pt-2">
-                                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                                    <Clock className="h-3.5 w-3.5" />
-                                    Last saved: {new Date(mockApplication.lastSavedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                                </p>
-                            </div>
+                            {application && (
+                                <div className="pt-2">
+                                    <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                        <Clock className="h-3.5 w-3.5" />
+                                        Last saved: {new Date(application.updated_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                                    </p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
-                    {/* Announcements */}
                     <Card className="border-border/50">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -117,57 +135,50 @@ export default function ApplicantDashboard() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {mockAnnouncements.map((ann, i) => (
+                            {announcements.length > 0 ? announcements.map((ann: ApplicantAnnouncement, i: number) => (
                                 <div key={ann.id}>
                                     <div className="flex items-start gap-3">
-                                        {ann.isPinned && <Pin className="h-3.5 w-3.5 text-primary mt-1 shrink-0" />}
+                                        {ann.is_pinned && <Pin className="h-3.5 w-3.5 text-primary mt-1 shrink-0" />}
                                         <div className="flex-1 space-y-1">
                                             <div className="flex items-start justify-between gap-2">
                                                 <p className="text-sm font-semibold leading-snug">{ann.title}</p>
-                                                {ann.isPinned && <Badge variant="secondary" className="text-[10px] shrink-0">Pinned</Badge>}
+                                                {ann.is_pinned && <Badge variant="secondary" className="text-[10px] shrink-0">Pinned</Badge>}
                                             </div>
                                             <p className="text-xs text-muted-foreground leading-relaxed">{ann.body}</p>
-                                            <p className="text-[10px] text-muted-foreground/70">{ann.author} · {ann.createdAt}</p>
+                                            <p className="text-[10px] text-muted-foreground/70">Program Office · {new Date(ann.created_at).toLocaleDateString()}</p>
                                         </div>
                                     </div>
-                                    {i < mockAnnouncements.length - 1 && <Separator className="mt-4" />}
+                                    {i < announcements.length - 1 && <Separator className="mt-4" />}
                                 </div>
-                            ))}
+                            )) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">No recent announcements.</p>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Right Column: Sidebar widgets */}
                 <div className="space-y-6">
-                    {/* Profile Completion */}
                     <Card className="border-border/50">
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-semibold">Profile Completion</CardTitle>
+                            <CardTitle className="text-sm font-semibold">Application Completion</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="flex items-end justify-between">
                                 <span className="text-3xl font-extrabold">{completionPct}%</span>
-                                <span className="text-xs text-muted-foreground mb-1">of application</span>
+                                <span className="text-xs text-muted-foreground mb-1">of process</span>
                             </div>
                             <Progress value={completionPct} className="h-2" />
                             <ul className="space-y-2 mt-2">
-                                {[
-                                    { label: "Personal Information", done: true },
-                                    { label: "Academic Background", done: true },
-                                    { label: "Essays", done: false },
-                                    { label: "Documents", done: false },
-                                    { label: "Review & Submit", done: false },
-                                ].map((item, i) => (
+                                {applicationSteps.map((item, i) => (
                                     <li key={i} className="flex items-center gap-2 text-xs">
-                                        <CheckCircle2 className={`h-3.5 w-3.5 shrink-0 ${item.done ? "text-primary" : "text-muted-foreground/30"}`} />
-                                        <span className={item.done ? "line-through text-muted-foreground" : ""}>{item.label}</span>
+                                        <CheckCircle2 className={`h-3.5 w-3.5 shrink-0 ${item.step < currentStep ? "text-primary" : "text-muted-foreground/30"}`} />
+                                        <span className={item.step < currentStep ? "line-through text-muted-foreground" : ""}>{item.label}</span>
                                     </li>
                                 ))}
                             </ul>
                         </CardContent>
                     </Card>
 
-                    {/* Important Deadlines */}
                     <Card className="border-border/50">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -176,29 +187,30 @@ export default function ApplicantDashboard() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {mockDeadlines.map((deadline) => (
+                            {deadlines.length > 0 ? deadlines.map((deadline: ApplicantDeadline) => (
                                 <div key={deadline.id} className="flex items-start gap-3">
-                                    {deadline.isUrgent ? (
+                                    {deadline.is_urgent ? (
                                         <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
                                     ) : (
                                         <Clock className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                                     )}
                                     <div className="flex-1 min-w-0">
                                         <p className="text-xs font-semibold leading-tight">{deadline.label}</p>
-                                        <p className="text-xs text-muted-foreground mt-0.5">{deadline.date}</p>
+                                        <p className="text-xs text-muted-foreground mt-0.5">{new Date(deadline.due_date).toLocaleDateString()}</p>
                                     </div>
                                     <Badge
                                         variant="outline"
-                                        className={`text-[10px] shrink-0 ${deadline.isUrgent ? "border-amber-300 text-amber-700 bg-amber-50" : ""}`}
+                                        className={`text-[10px] shrink-0 ${deadline.is_urgent ? "border-amber-300 text-amber-700 bg-amber-50" : ""}`}
                                     >
-                                        {deadline.daysLeft}d left
+                                        {deadline.days_left}d left
                                     </Badge>
                                 </div>
-                            ))}
+                            )) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">No upcoming deadlines.</p>
+                            )}
                         </CardContent>
                     </Card>
 
-                    {/* Recent Notifications */}
                     <Card className="border-border/50">
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
@@ -212,45 +224,29 @@ export default function ApplicantDashboard() {
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {mockNotifications.slice(0, 3).map((notif, i) => (
+                            {notifications.length > 0 ? notifications.slice(0, 3).map((notif: ApplicantNotification, i: number) => (
                                 <div key={notif.id}>
-                                    <div className={`flex items-start gap-2 ${!notif.isRead ? "opacity-100" : "opacity-70"}`}>
+                                    <div className={`flex items-start gap-2 ${!notif.is_read ? "opacity-100" : "opacity-70"}`}>
                                         <div className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${notif.type === "success" ? "bg-emerald-500" :
-                                                notif.type === "warning" ? "bg-amber-500" :
-                                                    notif.type === "error" ? "bg-red-500" :
-                                                        "bg-blue-500"
+                                            notif.type === "warning" ? "bg-amber-500" :
+                                                notif.type === "error" ? "bg-red-500" :
+                                                    "bg-blue-500"
                                             }`} />
                                         <div className="flex-1 min-w-0">
                                             <p className="text-xs font-medium leading-snug">{notif.title}</p>
                                             <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{notif.body}</p>
                                         </div>
                                     </div>
-                                    {i < mockNotifications.length - 2 && <Separator className="mt-3" />}
+                                    {i < notifications.length - 1 && i < 2 && <Separator className="mt-3" />}
                                 </div>
-                            ))}
-                            <Link href="/portal/notifications">
+                            )) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">No new notifications.</p>
+                            )}
+                            <Link href="/notifications">
                                 <Button variant="ghost" className="w-full text-xs h-8 mt-1 text-primary">
                                     View All Notifications
                                 </Button>
                             </Link>
-                        </CardContent>
-                    </Card>
-
-                    {/* Quick Actions */}
-                    <Card className="border-border/50 bg-muted/20">
-                        <CardContent className="pt-4 space-y-2">
-                            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Quick Actions</p>
-                            {[
-                                { label: "Download Application Guide", icon: FileText, href: "#" },
-                                { label: "Contact Support", icon: MessageSquare, href: "/contact" },
-                            ].map((action, i) => (
-                                <Link key={i} href={action.href}>
-                                    <Button variant="ghost" className="w-full justify-start h-9 text-sm font-normal">
-                                        <action.icon className="mr-2 h-3.5 w-3.5 text-primary" />
-                                        {action.label}
-                                    </Button>
-                                </Link>
-                            ))}
                         </CardContent>
                     </Card>
                 </div>

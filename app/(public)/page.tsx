@@ -5,33 +5,36 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
     ArrowRight, BookOpen, GraduationCap, Building2, Users, Target, CheckCircle2, Globe, TrendingUp,
-    Zap, HeartPulse, Leaf, Cog, Calendar, MapPin, Briefcase,
+    Zap, HeartPulse, Leaf, Cog, Calendar, Briefcase,
 } from "lucide-react";
-import { mockNews, mockPartners, mockImpactMetrics, mockFocusAreas } from "@/mock-data";
-
-const impactNumbers = [
-    { value: mockImpactMetrics[0].value.toString() + "+", label: mockImpactMetrics[0].label, sub: "Across all 36 states" },
-    { value: "45", label: "Partner Institutions", sub: "Academic & corporate" },
-    { value: mockImpactMetrics[1].value.toString() + "%", label: mockImpactMetrics[1].label, sub: "Industry-leading outcome" },
-    { value: mockImpactMetrics[2].value as string, label: mockImpactMetrics[2].label, sub: "100% transparent" },
-];
-
-const focusAreas = [
-    { title: mockFocusAreas[0].name, icon: Zap, desc: mockFocusAreas[0].description },
-    { title: mockFocusAreas[1].name, icon: HeartPulse, desc: mockFocusAreas[1].description },
-    { title: mockFocusAreas[2].name, icon: Leaf, desc: mockFocusAreas[2].description },
-    { title: mockFocusAreas[3].name, icon: Cog, desc: mockFocusAreas[3].description },
-];
-
-const spotlightScholars = [
-    { name: "Amara Okafor", state: "Anambra", discipline: "Data Science for Public Systems", quote: "The Initiative gave me the infrastructure to compete globally, while keeping my roots firmly Nigerian." },
-    { name: "Chukwuemeka Okoro", state: "Enugu", discipline: "Bio-Medical Engineering", quote: "From a public secondary school in Enugu to the National Health Institute — this program builds bridges others don't even see." },
-    { name: "Zainab Yusuf", state: "Kaduna", discipline: "Cybersecurity & Digital Trust", quote: "I applied not knowing if I stood a chance. The selection process was the most rigorous and fair process I have ever experienced." },
-];
-
+import { getPublicHomeData } from "@/lib/supabase/actions";
 import { Hero } from "@/components/sections/hero";
 
-export default function HomePage() {
+export default async function HomePage() {
+    const { impactMetrics, news, partners } = await getPublicHomeData();
+
+    const impactNumbers = impactMetrics.length > 0 ? impactMetrics.map(m => ({
+        value: m.value + (m.unit || ""),
+        label: m.label,
+        sub: m.description || ""
+    })) : [
+        { value: "36", label: "States Covered", sub: "Across the federation" },
+        { value: "100%", label: "Transparency", sub: "Fully verifiable" }
+    ];
+
+    const focusAreas = [
+        { title: "Clean Energy", icon: Zap, desc: "Powering Nigeria's industrial future with sustainable solar and grid innovations." },
+        { title: "Public Health", icon: HeartPulse, desc: "Building resilient health systems through bio-medical engineering and data." },
+        { title: "Agriculture", icon: Leaf, desc: "Scaling food security with climate-smart tech and supply chain optimizations." },
+        { title: "Manufacturing", icon: Cog, desc: "Driving the next era of local production and advanced robotics." },
+    ];
+
+    const spotlightScholars = [
+        { name: "Amara Okafor", state: "Anambra", discipline: "Data Science for Public Systems", quote: "The Initiative gave me the infrastructure to compete globally, while keeping my roots firmly Nigerian." },
+        { name: "Chukwuemeka Okoro", state: "Enugu", discipline: "Bio-Medical Engineering", quote: "From a public secondary school in Enugu to the National Health Institute — this program builds bridges others don't even see." },
+        { name: "Zainab Yusuf", state: "Kaduna", discipline: "Cybersecurity & Digital Trust", quote: "I applied not knowing if I stood a chance. The selection process was the most rigorous and fair process I have ever experienced." },
+    ];
+
     return (
         <div className="flex flex-col w-full">
             <Hero />
@@ -67,7 +70,7 @@ export default function HomePage() {
                         </Link>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        {impactNumbers.map((stat, i) => (
+                        {impactNumbers.slice(0, 4).map((stat, i) => (
                             <Card key={i} className="border-border/50 text-center p-6">
                                 <div className="text-3xl md:text-4xl font-extrabold text-primary mb-1">{stat.value}</div>
                                 <div className="font-semibold text-sm mb-1">{stat.label}</div>
@@ -218,15 +221,17 @@ export default function HomePage() {
                 description="Our programs are backed by leading universities, government agencies, and Nigeria's most impactful corporations."
             >
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-8">
-                    {mockPartners.slice(0, 8).map((partner) => (
+                    {partners.length > 0 ? partners.map((partner) => (
                         <div key={partner.id} className="flex flex-col items-center justify-center text-center p-4 rounded-xl border border-border/50 hover:border-primary/40 transition-colors min-h-[90px]">
                             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
                                 <Building2 className="h-4 w-4 text-primary" />
                             </div>
-                            <p className="text-xs font-medium leading-tight">{partner.name}</p>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">{partner.type}</p>
+                            <p className="text-xs font-medium leading-tight">{partner.first_name} {partner.last_name}</p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">{partner.role}</p>
                         </div>
-                    ))}
+                    )) : (
+                        <p className="col-span-full text-center text-sm text-muted-foreground py-8">No partners listed yet.</p>
+                    )}
                 </div>
                 <div className="mt-10 text-center">
                     <Link href="/partners">
@@ -248,25 +253,28 @@ export default function HomePage() {
                 }
             >
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-                    {mockNews.slice(0, 3).map((article) => (
+                    {news.map((article) => (
                         <Card key={article.id} className="border-border/50 hover:border-primary/40 transition-colors overflow-hidden flex flex-col">
                             <div className="aspect-video bg-muted/50 relative flex items-center justify-center">
-                                <div className="text-muted-foreground/15 text-8xl font-black">{article.category[0]}</div>
-                                <Badge variant="secondary" className="absolute top-3 left-3 text-xs">{article.category}</Badge>
+                                <div className="text-muted-foreground/15 text-8xl font-black">{article.priority[0]}</div>
+                                <Badge variant="secondary" className="absolute top-3 left-3 text-xs">{article.priority} Priority</Badge>
                             </div>
                             <CardContent className="pt-4 flex-1 flex flex-col gap-2">
                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <Calendar className="h-3 w-3" />
-                                    {article.date}
+                                    {new Date(article.created_at).toLocaleDateString()}
                                 </div>
                                 <h3 className="font-bold text-sm leading-snug line-clamp-2">{article.title}</h3>
-                                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed flex-1">{article.excerpt}</p>
+                                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed flex-1">{article.summary}</p>
                                 <Button variant="ghost" className="p-0 h-auto text-xs text-primary font-medium self-start mt-2">
                                     Read More <ArrowRight className="ml-1 h-3 w-3" />
                                 </Button>
                             </CardContent>
                         </Card>
                     ))}
+                    {news.length === 0 && (
+                        <p className="col-span-full text-center text-sm text-muted-foreground py-8">No news updates yet.</p>
+                    )}
                 </div>
             </SectionWrapper>
 
