@@ -10,15 +10,26 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Plus, Download, Search, Filter } from "lucide-react";
-import { adminSponsors } from "@/mock-data/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAdminSponsors } from "@/lib/supabase/actions";
+import { redirect } from "next/navigation";
 
-function getSponsorStatusClass(status: "Active" | "Renewal due" | "At risk") {
+function getSponsorStatusClass(status: string) {
     if (status === "Active") return "bg-emerald-100 text-emerald-800";
     if (status === "Renewal due") return "bg-amber-100 text-amber-800";
     return "bg-red-100 text-red-800";
 }
 
-export default function SponsorsPage() {
+export default async function SponsorsPage() {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        redirect("/login");
+    }
+
+    const sponsors = await getAdminSponsors();
+
     return (
         <PageContainer
             title="Sponsors Management"
@@ -61,20 +72,33 @@ export default function SponsorsPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {adminSponsors.map((sponsor) => (
-                                    <TableRow key={sponsor.name}>
-                                        <TableCell className="font-medium">{sponsor.name}</TableCell>
-                                        <TableCell>{sponsor.category}</TableCell>
-                                        <TableCell>{sponsor.commitment}</TableCell>
-                                        <TableCell>{sponsor.focus}</TableCell>
-                                        <TableCell>{sponsor.renewalWindow}</TableCell>
+                                {sponsors.map((sponsor: any) => (
+                                    <TableRow key={sponsor.id}>
+                                        <TableCell className="font-medium">
+                                            {sponsor.first_name} {sponsor.last_name}
+                                        </TableCell>
+                                        <TableCell>{sponsor.donor_details?.category || "—"}</TableCell>
                                         <TableCell>
-                                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${getSponsorStatusClass(sponsor.status)}`}>
-                                                {sponsor.status}
+                                            {sponsor.donor_details?.commitment
+                                                ? `N${(sponsor.donor_details.commitment / 1000000).toFixed(0)}M`
+                                                : "—"}
+                                        </TableCell>
+                                        <TableCell>{sponsor.donor_details?.investment_focus || "—"}</TableCell>
+                                        <TableCell>{sponsor.donor_details?.renewal_window || "—"}</TableCell>
+                                        <TableCell>
+                                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${getSponsorStatusClass(sponsor.donor_details?.status || "Active")}`}>
+                                                {sponsor.donor_details?.status || "Active"}
                                             </span>
                                         </TableCell>
                                     </TableRow>
                                 ))}
+                                {sponsors.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center py-6 text-muted-foreground text-sm">
+                                            No sponsors registered yet.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
                             </TableBody>
                         </Table>
                     </CardContent>

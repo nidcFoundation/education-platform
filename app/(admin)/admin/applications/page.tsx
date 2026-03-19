@@ -14,46 +14,45 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { ClipboardCheck, Clock3, FileCheck2, Users } from "lucide-react";
-import {
-    adminApplications,
-    applicationPipeline,
-    reviewerWorkloads,
-} from "@/mock-data/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAdminApplications } from "@/lib/supabase/actions";
+import { redirect } from "next/navigation";
 
-const applicationMetrics = [
-    {
-        title: "Total Applicants",
-        value: "1,482",
-        description: "Across open application windows",
-        icon: Users,
-    },
-    {
-        title: "Pending Review",
-        value: "346",
-        description: "Need reviewer assignment or decision",
-        icon: ClipboardCheck,
-    },
-    {
-        title: "Interviews Scheduled",
-        value: "74",
-        description: "Confirmed panel interviews next 10 days",
-        icon: Clock3,
-    },
-    {
-        title: "Decision Ready",
-        value: "128",
-        description: "Awaiting final approval or rejection",
-        icon: FileCheck2,
-    },
-];
-
-function getPriorityClass(priority: "High" | "Medium" | "Low") {
+function getPriorityClass(priority: string) {
     if (priority === "High") return "bg-red-100 text-red-800";
     if (priority === "Medium") return "bg-amber-100 text-amber-800";
     return "bg-slate-100 text-slate-800";
 }
 
-export default function ApplicationsManagementPage() {
+export default async function ApplicationsManagementPage() {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        redirect("/login");
+    }
+
+    const applications = await getAdminApplications();
+
+    const totalApplicants = applications.length;
+    const pendingReview = applications.filter((a: any) => a.status === "pending").length;
+    const interviewStage = applications.filter((a: any) => a.status === "interviewing").length;
+    const decisionReady = applications.filter((a: any) => a.status === "shortlisted").length;
+
+    const applicationMetrics = [
+        { title: "Total Applicants", value: totalApplicants.toLocaleString(), description: "Across open application windows", icon: Users },
+        { title: "Pending Review", value: pendingReview.toString(), description: "Need reviewer assignment", icon: ClipboardCheck },
+        { title: "Interviews Active", value: interviewStage.toString(), description: "Currently in interview cycle", icon: Clock3 },
+        { title: "Decision Ready", value: decisionReady.toString(), description: "Awaiting final approval", icon: FileCheck2 },
+    ];
+
+    const pipelineData = [
+        { label: "Intake", value: 100, color: "#475569" },
+        { label: "Screening", value: Math.round((applications.filter((a: any) => a.status !== "pending").length / (totalApplicants || 1)) * 100), color: "#0284c7" },
+        { label: "Interview", value: Math.round((applications.filter((a: any) => ["interviewing", "shortlisted", "accepted"].includes(a.status)).length / (totalApplicants || 1)) * 100), color: "#d97706" },
+        { label: "Offer", value: Math.round((applications.filter((a: any) => a.status === "accepted").length / (totalApplicants || 1)) * 100), color: "#0f766e" },
+    ];
+
     return (
         <PageContainer
             title="Applications Management"
@@ -85,26 +84,24 @@ export default function ApplicationsManagementPage() {
                             <CardDescription>Conversion from intake through final decision issuance.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <HorizontalBarChart items={applicationPipeline} valueSuffix="%" />
+                            <HorizontalBarChart items={pipelineData} valueSuffix="%" />
                         </CardContent>
                     </Card>
 
                     <Card className="border-border/60">
                         <CardHeader>
                             <CardTitle>Reviewer Load</CardTitle>
-                            <CardDescription>Current reviewer queues, specialisations, and average turnaround.</CardDescription>
+                            <CardDescription>Current reviewer queues, specialisations, and turnaround.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {reviewerWorkloads.map((reviewer) => (
-                                <div key={reviewer.name} className="rounded-xl border bg-background p-4">
-                                    <div className="flex items-center justify-between gap-4">
-                                        <p className="font-medium">{reviewer.name}</p>
-                                        <span className="text-sm font-semibold">{reviewer.queue} in queue</span>
-                                    </div>
-                                    <p className="mt-2 text-sm text-muted-foreground">{reviewer.specialty}</p>
-                                    <p className="mt-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">{reviewer.sla}</p>
+                            <div className="rounded-xl border bg-background p-4">
+                                <div className="flex items-center justify-between gap-4">
+                                    <p className="font-medium">System Auto-Review</p>
+                                    <span className="text-sm font-semibold">{pendingReview} in queue</span>
                                 </div>
-                            ))}
+                                <p className="mt-2 text-sm text-muted-foreground">Initial screening and scoring</p>
+                                <p className="mt-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">SLA: 24 Hours</p>
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
@@ -113,7 +110,7 @@ export default function ApplicationsManagementPage() {
                     <CardHeader className="flex flex-row items-start justify-between gap-4">
                         <div>
                             <CardTitle>Applications Queue</CardTitle>
-                            <CardDescription>Live sample queue for reviewer assignment, scoring, and interview coordination.</CardDescription>
+                            <CardDescription>Live queue for reviewer assignment, scoring, and interview coordination.</CardDescription>
                         </div>
                         <Button asChild variant="outline" size="sm">
                             <Link href="/admin/applications/review">Review featured application</Link>
@@ -124,42 +121,42 @@ export default function ApplicationsManagementPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Applicant</TableHead>
-                                    <TableHead>Programme</TableHead>
-                                    <TableHead>Priority</TableHead>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Cohort</TableHead>
                                     <TableHead>Status</TableHead>
-                                    <TableHead>Reviewer</TableHead>
-                                    <TableHead>Interview</TableHead>
                                     <TableHead>Score</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {adminApplications.map((application) => (
+                                {applications.map((application: any) => (
                                     <TableRow key={application.id}>
                                         <TableCell>
                                             <div>
-                                                <p className="font-medium">{application.applicant}</p>
-                                                <p className="text-xs text-muted-foreground">{application.id} · {application.state}</p>
+                                                <p className="font-medium">
+                                                    {application.profiles?.first_name} {application.profiles?.last_name}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">{application.id.slice(0, 8)}</p>
                                             </div>
                                         </TableCell>
+                                        <TableCell>{application.profiles?.email}</TableCell>
                                         <TableCell>
                                             <div>
-                                                <p>{application.program}</p>
-                                                <p className="text-xs text-muted-foreground">Cohort {application.cohort}</p>
+                                                <p>Cohort {application.cohort_year}</p>
                                             </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${getPriorityClass(application.priority)}`}>
-                                                {application.priority}
-                                            </span>
                                         </TableCell>
                                         <TableCell>
                                             <ApplicationStatusBadge status={application.status} />
                                         </TableCell>
-                                        <TableCell>{application.reviewer}</TableCell>
-                                        <TableCell>{application.interviewWindow}</TableCell>
                                         <TableCell>{application.score === null ? "Awaiting" : `${application.score}/100`}</TableCell>
                                     </TableRow>
                                 ))}
+                                {applications.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center py-6 text-muted-foreground text-sm">
+                                            No applications submitted yet.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
                             </TableBody>
                         </Table>
                     </CardContent>

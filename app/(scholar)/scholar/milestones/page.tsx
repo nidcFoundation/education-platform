@@ -4,7 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Calendar, Flag, Target } from "lucide-react";
-import { scholarMilestones } from "@/mock-data/scholar";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getScholarDashboardData } from "@/lib/supabase/actions";
+import { redirect } from "next/navigation";
 
 const categoryCompletion = [
     { label: "Course completion", value: 100 },
@@ -14,10 +16,32 @@ const categoryCompletion = [
     { label: "Industry placements", value: 40 },
 ];
 
-export default function MilestonesPage() {
-    const completed = scholarMilestones.filter((milestone) => milestone.status === "completed").length;
-    const active = scholarMilestones.filter((milestone) => milestone.status === "active").length;
-    const upcoming = scholarMilestones.filter((milestone) => milestone.status === "upcoming").length;
+export default async function MilestonesPage() {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        redirect("/login");
+    }
+
+    const {
+        milestones
+    } = await getScholarDashboardData(user.id);
+
+    const milestonesList = milestones.map((m: any) => ({
+        id: m.id,
+        title: m.title,
+        category: m.category,
+        status: m.status,
+        dueDate: new Date(m.due_date).toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' }),
+        owner: m.owner || "Program Office",
+        impact: m.impact_description || "Public-sector and research impact",
+        evidence: m.evidence_link || "Pending upload"
+    }));
+
+    const completed = milestonesList.filter((m: any) => m.status === "completed").length;
+    const active = milestonesList.filter((m: any) => m.status === "active").length;
+    const upcoming = milestonesList.filter((m: any) => m.status === "upcoming").length;
 
     return (
         <PageContainer
@@ -72,7 +96,7 @@ export default function MilestonesPage() {
                             <CardDescription>Delivery detail, evidence, and impact for each core milestone.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {scholarMilestones.map((milestone) => (
+                            {milestonesList.map((milestone: any) => (
                                 <div key={milestone.id} className="rounded-xl border bg-background p-4">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div className="space-y-2">
@@ -105,6 +129,11 @@ export default function MilestonesPage() {
                                     </div>
                                 </div>
                             ))}
+                            {milestonesList.length === 0 && (
+                                <div className="text-sm text-muted-foreground text-center py-12 border border-dashed rounded-xl">
+                                    No milestones found.
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>

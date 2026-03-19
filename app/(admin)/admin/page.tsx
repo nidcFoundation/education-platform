@@ -26,29 +26,43 @@ import {
     ShieldCheck,
     Users,
 } from "lucide-react";
-import {
-    adminApplications,
-    adminCohortDistribution,
-    adminDashboardMetrics,
-    adminFundingDistribution,
-    adminOperationalPulse,
-    adminProgramPerformance,
-    adminSectionLinks,
-} from "@/mock-data/admin";
+import { getAdminDashboardData } from "@/lib/supabase/actions";
+import { adminFundingDistribution, adminSectionLinks } from "@/mock-data/admin";
 
 const dashboardIcons = [
-  Users,
-  ClipboardList,
-  GraduationCap,
-  Flag,
-  Banknote,
-  BarChart3,
+    Users,
+    ClipboardList,
+    GraduationCap,
+    Flag,
+    Banknote,
+    BarChart3,
 ];
 
-export default function AdminDashboardPage() {
-    const totalCohortPopulation = adminCohortDistribution
-        .reduce((sum, cohort) => sum + cohort.value, 0)
-        .toLocaleString();
+export default async function AdminDashboardPage() {
+    const { counts, applications, cohorts, programs } = await getAdminDashboardData();
+
+    const totalCohortPopulation = cohorts.reduce((sum: number, cohort: any) => sum + (cohort.active_scholars_count || 0), 0);
+
+    const adminDashboardMetrics = [
+        { title: "Active Scholars", value: counts.scholars.toLocaleString(), description: "Currently enrolled", trend: { value: 12, isPositive: true } },
+        { title: "Review Queue", value: counts.applicants.toLocaleString(), description: "Applications pending", trend: { value: 5, isPositive: false } },
+        { title: "Cohort Health", value: "94%", description: "Average progress score", trend: { value: 2, isPositive: true } },
+        { title: "Active Programs", value: programs.length.toString(), description: "Deployment tracks", trend: { value: 0, isPositive: true } },
+        { title: "Funding Deployed", value: "₦42.8M", description: "Disbursed this cycle", trend: { value: 8, isPositive: true } },
+        { title: "National Impact", value: "1.2k", description: "Beneficiaries reached", trend: { value: 15, isPositive: true } },
+    ];
+
+    const adminCohortDistribution = cohorts.map((c: any) => ({
+        label: `Cohort ${c.year}`,
+        value: c.active_scholars_count || 0,
+        color: `hsl(var(--primary) / ${0.5 + Math.random() * 0.5})`
+    }));
+
+    const adminProgramPerformance = programs.slice(0, 5).map((p: any) => ({
+        label: p.title,
+        value: p.completion_rate || 0,
+        color: "var(--primary)"
+    }));
 
     return (
         <PageContainer
@@ -74,7 +88,7 @@ export default function AdminDashboardPage() {
                                             Operations healthy
                                         </span>
                                         <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold">
-                                            March intake cycle
+                                            {cohorts[0]?.year || "2026"} intake cycle
                                         </span>
                                     </div>
                                     <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
@@ -112,7 +126,11 @@ export default function AdminDashboardPage() {
                                     <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Operational Pulse</p>
                                 </div>
                                 <div className="mt-4 space-y-4">
-                                    {adminOperationalPulse.map((item) => (
+                                    {[
+                                        { label: "Review queue", value: counts.applicants.toLocaleString(), detail: "Applications pending internal reviewer action" },
+                                        { label: "Active scholars", value: counts.scholars.toLocaleString(), detail: "Scholars currently tracked across all programs" },
+                                        { label: "Live cohorts", value: cohorts.length.toString(), detail: "Scholar intake windows currently being managed" },
+                                    ].map((item) => (
                                         <div key={item.label} className="rounded-xl border bg-muted/15 p-4">
                                             <div className="flex items-center justify-between gap-3">
                                                 <p className="font-medium">{item.label}</p>
@@ -151,7 +169,7 @@ export default function AdminDashboardPage() {
                             <DonutBreakdownChart
                                 items={adminCohortDistribution}
                                 totalLabel="Scholars tracked"
-                                totalValue={totalCohortPopulation}
+                                totalValue={totalCohortPopulation.toLocaleString()}
                             />
                         </CardContent>
                     </Card>
@@ -185,25 +203,30 @@ export default function AdminDashboardPage() {
                                         <TableHead>Application</TableHead>
                                         <TableHead>Programme</TableHead>
                                         <TableHead>Status</TableHead>
-                                        <TableHead>Reviewer</TableHead>
+                                        <TableHead>Date</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {adminApplications.slice(0, 4).map((application) => (
+                                    {applications.slice(0, 4).map((application: any) => (
                                         <TableRow key={application.id}>
                                             <TableCell>
                                                 <div>
-                                                    <p className="font-medium">{application.applicant}</p>
-                                                    <p className="text-xs text-muted-foreground">{application.id}</p>
+                                                    <p className="font-medium">{application.profiles?.first_name} {application.profiles?.last_name}</p>
+                                                    <p className="text-xs text-muted-foreground">{application.id.slice(0, 8)}</p>
                                                 </div>
                                             </TableCell>
-                                            <TableCell>{application.program}</TableCell>
+                                            <TableCell>{application.program_id?.slice(0, 8) || "N/A"}</TableCell>
                                             <TableCell>
                                                 <ApplicationStatusBadge status={application.status} />
                                             </TableCell>
-                                            <TableCell>{application.reviewer}</TableCell>
+                                            <TableCell>{new Date(application.created_at).toLocaleDateString()}</TableCell>
                                         </TableRow>
                                     ))}
+                                    {applications.length === 0 && (
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="text-center text-muted-foreground">No applications in queue.</TableCell>
+                                        </TableRow>
+                                    )}
                                 </TableBody>
                             </Table>
                         </CardContent>

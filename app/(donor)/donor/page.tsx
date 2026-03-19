@@ -12,29 +12,68 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ArrowRight, Banknote, BarChart3, Briefcase, GraduationCap, Target, Users } from "lucide-react";
-import {
-    donorDashboardMetrics,
-    donorProfile,
-    fundDistribution,
-    programGrowth,
-    scholarOutcomeBreakdown,
-    sectorPlacementBreakdown,
-    sponsoredScholars,
-} from "@/mock-data/donor";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getDonorDashboardData } from "@/lib/supabase/actions";
+import { redirect } from "next/navigation";
+import { programGrowth, sectorPlacementBreakdown } from "@/mock-data/donor";
 
 const dashboardIcons = [
-  Users,
-  Banknote,
-  Banknote,
-  Target,
-  GraduationCap,
-  Briefcase,
+    Users,
+    Banknote,
+    Banknote,
+    Target,
+    GraduationCap,
+    Briefcase,
 ];
 
-export default function DonorDashboardPage() {
-    const averageProgress = Math.round(
-        sponsoredScholars.reduce((sum, scholar) => sum + scholar.progressScore, 0) / Math.max(sponsoredScholars.length, 1)
-    );
+export default async function DonorDashboardPage() {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        redirect("/login");
+    }
+
+    const {
+        profile,
+        impactMetrics,
+        fundingRecords,
+        sponsoredScholars
+    } = await getDonorDashboardData(user.id);
+
+    const averageProgress = sponsoredScholars.length > 0
+        ? Math.round(sponsoredScholars.reduce((sum: number, scholar: any) => sum + (scholar.progress_score || 0), 0) / sponsoredScholars.length)
+        : 0;
+
+    const totalFunding = fundingRecords.reduce((acc: number, curr: any) => acc + Number(curr.amount), 0);
+    const formattedTotalFunding = new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(totalFunding);
+
+    const totalImpact = impactMetrics.reduce((acc: number, curr: any) => acc + (isNaN(Number(curr.value)) ? 0 : Number(curr.value)), 0);
+    const formattedImpact = totalImpact >= 1000 ? `${(totalImpact / 1000).toFixed(1)}k` : totalImpact.toString();
+
+    const donorDashboardMetrics = [
+        { title: "Sponsored Scholars", value: sponsoredScholars.length.toString(), description: "Active beneficiaries" },
+        { title: "Total Deployed", value: formattedTotalFunding, description: "Funding transparently tracked" },
+        { title: "Direct Impact", value: formattedImpact, description: "Community reach through scholars" },
+        { title: "Placement Rate", value: "88%", description: "Industry deployment success" },
+        { title: "Graduation Rate", value: "96%", description: "Completion on-track" },
+        { title: "Active Programs", value: "4", description: "Strategic focus areas" },
+    ];
+
+    const fundDistribution = fundingRecords.map((f: any) => ({
+        label: f.category,
+        value: Number(f.amount),
+        color: `hsl(var(--primary) / ${0.4 + Math.random() * 0.6})`
+    }));
+
+    const scholarOutcomeBreakdown = [
+        { label: "High Performance", value: sponsoredScholars.filter((s: any) => (s.progress_score || 0) >= 80).length, color: "var(--primary)" },
+        { label: "On Track", value: sponsoredScholars.filter((s: any) => (s.progress_score || 0) >= 60 && (s.progress_score || 0) < 80).length, color: "#f59e0b" },
+        { label: "Support Needed", value: sponsoredScholars.filter((s: any) => (s.progress_score || 0) < 60).length, color: "#ef4444" },
+    ].map(item => ({
+        ...item,
+        value: sponsoredScholars.length > 0 ? Math.round((item.value / sponsoredScholars.length) * 100) : 0
+    }));
 
     return (
         <PageContainer
@@ -55,24 +94,24 @@ export default function DonorDashboardPage() {
                             <div className="space-y-5">
                                 <div>
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <h2 className="text-2xl font-semibold tracking-tight">{donorProfile.organization}</h2>
+                                        <h2 className="text-2xl font-semibold tracking-tight">{profile?.organization || "Donor Organization"}</h2>
                                         <Badge variant="secondary">Active Donor</Badge>
-                                        <Badge variant="outline">{donorProfile.donorId}</Badge>
+                                        <Badge variant="outline">{profile?.donor_id || "DNR-Pending"}</Badge>
                                     </div>
                                     <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-                                        {donorProfile.focus}
+                                        {profile?.bio || "No description provided."}
                                     </p>
                                 </div>
 
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <div className="rounded-xl border bg-background/85 p-4">
                                         <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Commitment Window</p>
-                                        <p className="mt-2 font-semibold">{donorProfile.pledgeWindow}</p>
-                                        <p className="mt-1 text-sm text-muted-foreground">Relationship manager: {donorProfile.relationshipManager}</p>
+                                        <p className="mt-2 font-semibold">2024 - 2028</p>
+                                        <p className="mt-1 text-sm text-muted-foreground">Relationship manager: Support Team</p>
                                     </div>
                                     <div className="rounded-xl border bg-background/85 p-4">
                                         <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Total Commitment</p>
-                                        <p className="mt-2 text-3xl font-bold tracking-tight">{donorProfile.totalCommitment}</p>
+                                        <p className="mt-2 text-3xl font-bold tracking-tight">{formattedTotalFunding}</p>
                                         <p className="mt-1 text-sm text-muted-foreground">Transparent across scholar funding and development support.</p>
                                     </div>
                                 </div>
@@ -83,7 +122,7 @@ export default function DonorDashboardPage() {
                                 <div className="mt-4 space-y-4">
                                     {[
                                         { label: "Funding visibility", value: 100, detail: "Every allocation line is trackable by category and scholar." },
-                                        { label: "Scholar development coverage", value: 88, detail: "Sponsored scholars remain on-track across academic and career milestones." },
+                                        { label: "Scholar development coverage", value: averageProgress, detail: "Sponsored scholars remain on-track across academic and career milestones." },
                                         { label: "Outcome reporting cadence", value: 93, detail: "Quarterly impact packets and annual reports are current." },
                                     ].map((item) => (
                                         <div key={item.label} className="space-y-2">
@@ -129,9 +168,9 @@ export default function DonorDashboardPage() {
                         </CardHeader>
                         <CardContent>
                             <DonutBreakdownChart
-                                items={fundDistribution}
+                                items={fundDistribution.length > 0 ? fundDistribution : [{ label: "No funding yet", value: 0, color: "var(--muted)" }]}
                                 totalLabel="Deployed"
-                                totalValue="₦14.2M"
+                                totalValue={formattedTotalFunding}
                             />
                         </CardContent>
                     </Card>
@@ -184,48 +223,40 @@ export default function DonorDashboardPage() {
                         </Button>
                     </CardHeader>
                     <CardContent className="grid gap-4 lg:grid-cols-2">
-                        {sponsoredScholars.map((scholar) => (
+                        {sponsoredScholars.map((scholar: any) => (
                             <div key={scholar.id} className="rounded-xl border bg-background p-4">
                                 <div className="flex items-start gap-3">
                                     <Avatar size="lg" className="h-12 w-12">
                                         <AvatarFallback className="bg-primary/12 font-semibold text-primary">
-                                            {scholar.initials}
+                                            {scholar.first_name[0]}{scholar.last_name[0]}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div className="flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <p className="font-semibold">{scholar.name}</p>
+                                            <p className="font-semibold">{scholar.first_name} {scholar.last_name}</p>
                                             <Badge variant="outline">Cohort {scholar.cohort}</Badge>
                                         </div>
                                         <p className="text-sm text-muted-foreground">{scholar.program} · {scholar.institution}</p>
                                     </div>
                                     <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-                                        {scholar.performance}
+                                        {scholar.progress_score >= 80 ? "Excellent" : scholar.progress_score >= 60 ? "On Track" : "Needs Review"}
                                     </Badge>
                                 </div>
 
                                 <div className="mt-4 space-y-2">
                                     <div className="flex items-center justify-between text-sm">
                                         <span className="text-muted-foreground">Development score</span>
-                                        <span className="font-semibold">{scholar.progressScore}%</span>
+                                        <span className="font-semibold">{scholar.progress_score || 0}%</span>
                                     </div>
-                                    <Progress value={scholar.progressScore} className="h-2" />
+                                    <Progress value={scholar.progress_score || 0} className="h-2" />
                                 </div>
 
-                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                    <div className="rounded-lg bg-muted/20 p-3">
-                                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Allocated</p>
-                                        <p className="mt-2 font-semibold">{scholar.allocation}</p>
-                                    </div>
-                                    <div className="rounded-lg bg-muted/20 p-3">
-                                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Used</p>
-                                        <p className="mt-2 font-semibold">{scholar.used}</p>
-                                    </div>
-                                </div>
-
-                                <p className="mt-4 text-sm text-muted-foreground">{scholar.impact}</p>
+                                <p className="mt-4 text-sm text-muted-foreground">{scholar.bio?.slice(0, 100)}...</p>
                             </div>
                         ))}
+                        {sponsoredScholars.length === 0 && (
+                            <p className="text-sm text-muted-foreground">No sponsored scholars yet.</p>
+                        )}
                     </CardContent>
                 </Card>
             </div>

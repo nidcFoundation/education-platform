@@ -17,12 +17,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ClipboardList, FileText, TrendingUp } from "lucide-react";
-import { progressReports } from "@/mock-data/scholar";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getScholarProgressReports } from "@/lib/supabase/actions";
+import { redirect } from "next/navigation";
 
-export default function ProgressReportsPage() {
+export default async function ProgressReportsPage() {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const progressReports = await getScholarProgressReports(user.id);
+
   const latestReport = progressReports.find(
-    (report) => report.status === "active"
-  );
+    (report: any) => report.status === "active"
+  ) || progressReports[0];
 
   if (!latestReport) {
     return (
@@ -53,7 +64,7 @@ export default function ProgressReportsPage() {
                 <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
                   Latest score
                 </p>
-                <p className="mt-3 text-3xl font-bold">{latestReport.score}</p>
+                <p className="mt-3 text-3xl font-bold">{latestReport.score || "N/A"}</p>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {latestReport.period} review cycle
                 </p>
@@ -62,9 +73,9 @@ export default function ProgressReportsPage() {
                 <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
                   Reviewer
                 </p>
-                <p className="mt-3 font-semibold">{latestReport.reviewer}</p>
+                <p className="mt-3 font-semibold">{latestReport.reviewer || "System Review"}</p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Submitted on {latestReport.submittedOn}
+                  Submitted on {latestReport.submitted_on ? new Date(latestReport.submitted_on).toLocaleDateString() : "Pending"}
                 </p>
               </div>
               <div className="rounded-xl border bg-background/80 p-4">
@@ -72,7 +83,7 @@ export default function ProgressReportsPage() {
                   Report summary
                 </p>
                 <p className="mt-3 text-sm text-muted-foreground">
-                  {latestReport.summary}
+                  {latestReport.summary || "No summary available for this cycle."}
                 </p>
               </div>
             </div>
@@ -102,14 +113,14 @@ export default function ProgressReportsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {progressReports.map((report) => (
+                  {progressReports.map((report: any) => (
                     <TableRow key={report.id}>
                       <TableCell className="font-medium">
                         {report.period}
                       </TableCell>
-                      <TableCell>{report.submittedOn}</TableCell>
-                      <TableCell>{report.reviewer}</TableCell>
-                      <TableCell>{report.score}</TableCell>
+                      <TableCell>{report.submitted_on ? new Date(report.submitted_on).toLocaleDateString() : "Pending"}</TableCell>
+                      <TableCell>{report.reviewer || "—"}</TableCell>
+                      <TableCell>{report.score || "—"}</TableCell>
                       <TableCell>
                         <StatusBadge status={report.status} />
                       </TableCell>
@@ -132,7 +143,7 @@ export default function ProgressReportsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {latestReport.priorities.map((priority) => (
+                {latestReport.priorities?.map((priority: string) => (
                   <div
                     key={priority}
                     className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground"
@@ -140,6 +151,9 @@ export default function ProgressReportsPage() {
                     {priority}
                   </div>
                 ))}
+                {(!latestReport.priorities || latestReport.priorities.length === 0) && (
+                  <p className="text-sm text-muted-foreground">No priority items defined for this cycle.</p>
+                )}
               </CardContent>
             </Card>
 
@@ -154,18 +168,14 @@ export default function ProgressReportsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-sm text-muted-foreground">
-                <div className="rounded-xl border bg-background p-4">
-                  Academic growth is exceeding expectation, particularly where
-                  coursework is tied to applied outputs.
-                </div>
-                <div className="rounded-xl border bg-background p-4">
-                  Placement readiness is improving, but interview storytelling
-                  and concise positioning still need work.
-                </div>
-                <div className="rounded-xl border bg-background p-4">
-                  Impact tracking is credible and consistent, with strong
-                  evidence attached to service contributions.
-                </div>
+                {latestReport.signals?.map((signal: string) => (
+                  <div key={signal} className="rounded-xl border bg-background p-4">
+                    {signal}
+                  </div>
+                ))}
+                {(!latestReport.signals || latestReport.signals.length === 0) && (
+                  <p className="text-sm text-muted-foreground">No signals detected yet.</p>
+                )}
               </CardContent>
             </Card>
           </div>

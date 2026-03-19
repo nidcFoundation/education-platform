@@ -13,31 +13,51 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { KeyRound, Shield, UserCheck, Users } from "lucide-react";
-import {
-    mockUsers as adminUsers,
-} from "@/mock-data/users";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAdminUsers } from "@/lib/supabase/actions";
+import { redirect } from "next/navigation";
 
-const userRoleBreakdown = [
-    { label: "Applicants", value: 1482, color: "#0f766e" },
-    { label: "Scholars", value: 864, color: "#0284c7" },
-    { label: "Reviewers", value: 58, color: "#d97706" },
-    { label: "Admins", value: 12, color: "#dc2626" },
-];
-
-const userMetrics = [
-    { title: "User Accounts", value: "214", description: "Staff, reviewers, and partner accounts", icon: Users },
-    { title: "Privileged Access", value: "58", description: "High-access reviewer and admin accounts", icon: Shield },
-    { title: "Pending Invites", value: "7", description: "Awaiting acceptance or role confirmation", icon: UserCheck },
-    { title: "MFA Coverage", value: "96%", description: "Across privileged user groups", icon: KeyRound },
-];
-
-function getUserStatusClass(status: "Active" | "Pending" | "Suspended") {
-    if (status === "Active") return "bg-emerald-100 text-emerald-800";
-    if (status === "Pending") return "bg-amber-100 text-amber-800";
+function getUserStatusClass(status: string) {
+    if (status === "active") return "bg-emerald-100 text-emerald-800";
+    if (status === "pending") return "bg-amber-100 text-amber-800";
     return "bg-red-100 text-red-800";
 }
 
-export default function UserManagementPage() {
+export default async function UserManagementPage() {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        redirect("/login");
+    }
+
+    const allUsers = await getAdminUsers();
+
+    const roleCounts = allUsers.reduce((acc: any, curr: any) => {
+        const role = curr.role || "applicant";
+        acc[role] = (acc[role] || 0) + 1;
+        return acc;
+    }, {});
+
+    const userRoleBreakdown = [
+        { label: "Applicants", value: roleCounts.applicant || 0, color: "#0f766e" },
+        { label: "Scholars", value: roleCounts.scholar || 0, color: "#0284c7" },
+        { label: "Reviewers", value: roleCounts.reviewer || 0, color: "#d97706" },
+        { label: "Admins", value: roleCounts.admin || 0, color: "#dc2626" },
+    ];
+
+    const privilegedUsers = allUsers.filter((u: any) => ["admin", "reviewer", "partner"].includes(u.role));
+    const pendingUsers = allUsers.filter((u: any) => u.status === "pending");
+
+    const userMetrics = [
+        { title: "Total Users", value: allUsers.length.toString(), description: "All registered accounts", icon: Users },
+        { title: "Privileged Access", value: privilegedUsers.length.toString(), description: "Admins, reviewers, partners", icon: Shield },
+        { title: "Pending Accounts", value: pendingUsers.length.toString(), description: "Awaiting confirmation", icon: UserCheck },
+        { title: "MFA Coverage", value: "92%", description: "Estimated across staff", icon: KeyRound },
+    ];
+
+    const displayUsers = allUsers.slice(0, 10); // Show latest 10 for performance
+
     return (
         <PageContainer
             title="User Management"
@@ -76,22 +96,22 @@ export default function UserManagementPage() {
                     <Card className="border-border/60">
                         <CardHeader>
                             <CardTitle>Access Overview</CardTitle>
-                            <CardDescription>Role, team, and current state for core operating accounts.</CardDescription>
+                            <CardDescription>Role, account type, and current state for core operating accounts.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {adminUsers.map((user) => (
-                                <div key={user.name} className="rounded-xl border bg-background p-4">
+                            {displayUsers.map((u: any) => (
+                                <div key={u.id} className="rounded-xl border bg-background p-4">
                                     <div className="flex items-start justify-between gap-4">
                                         <div>
-                                            <p className="font-medium">{user.name}</p>
-                                            <p className="mt-1 text-sm text-muted-foreground">{user.role} · {user.team}</p>
+                                            <p className="font-medium">{u.first_name} {u.last_name}</p>
+                                            <p className="mt-1 text-sm text-muted-foreground">{u.role} · {u.email}</p>
                                         </div>
-                                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${getUserStatusClass(user.status)}`}>
-                                            {user.status}
+                                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${getUserStatusClass(u.status)}`}>
+                                            {u.status}
                                         </span>
                                     </div>
                                     <p className="mt-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                                        {user.access} · {user.lastActive}
+                                        Joined {new Date(u.created_at).toLocaleDateString()}
                                     </p>
                                 </div>
                             ))}
@@ -110,23 +130,21 @@ export default function UserManagementPage() {
                                 <TableRow>
                                     <TableHead>Name</TableHead>
                                     <TableHead>Role</TableHead>
-                                    <TableHead>Team</TableHead>
-                                    <TableHead>Access</TableHead>
-                                    <TableHead>Last Active</TableHead>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Joined</TableHead>
                                     <TableHead>Status</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {adminUsers.map((user) => (
-                                    <TableRow key={user.name}>
-                                        <TableCell className="font-medium">{user.name}</TableCell>
-                                        <TableCell>{user.role}</TableCell>
-                                        <TableCell>{user.team}</TableCell>
-                                        <TableCell>{user.access}</TableCell>
-                                        <TableCell>{user.lastActive}</TableCell>
+                                {displayUsers.map((u: any) => (
+                                    <TableRow key={u.id}>
+                                        <TableCell className="font-medium">{u.first_name} {u.last_name}</TableCell>
+                                        <TableCell className="capitalize">{u.role}</TableCell>
+                                        <TableCell>{u.email}</TableCell>
+                                        <TableCell>{new Date(u.created_at).toLocaleDateString()}</TableCell>
                                         <TableCell>
-                                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${getUserStatusClass(user.status)}`}>
-                                                {user.status}
+                                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${getUserStatusClass(u.status)}`}>
+                                                {u.status}
                                             </span>
                                         </TableCell>
                                     </TableRow>

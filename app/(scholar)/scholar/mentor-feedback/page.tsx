@@ -3,20 +3,43 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Calendar, MessageSquare, Target, User } from "lucide-react";
-import { mentorSessions, scholarProfile } from "@/mock-data/scholar";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getScholarDashboardData } from "@/lib/supabase/actions";
+import { redirect } from "next/navigation";
 
-const sentimentClasses = {
+const sentimentClasses: Record<string, string> = {
     Strong: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
     Positive: "bg-blue-100 text-blue-800 hover:bg-blue-100",
     Watch: "bg-amber-100 text-amber-800 hover:bg-amber-100",
 };
 
-export default function MentorFeedbackPage() {
-    const latestSession = mentorSessions
-      .slice()
-      .sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      )[0];
+export default async function MentorFeedbackPage() {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        redirect("/login");
+    }
+
+    const {
+        profile,
+        mentorSessions
+    } = await getScholarDashboardData(user.id);
+
+    const sessions = mentorSessions.map((s: any) => ({
+        id: s.id,
+        date: new Date(s.date).toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' }),
+        mentor: s.mentor_name,
+        theme: s.theme,
+        sentiment: s.sentiment || "Positive",
+        summary: s.summary,
+        strengths: s.strengths || [],
+        actionItems: s.action_items || []
+    }));
+
+    const latestSession = sessions[0];
+    const mentorName = profile?.mentor_name || latestSession?.mentor || "Assigned Mentor";
+    const mentorTitle = profile?.mentor_title || "Program Mentor";
 
     return (
         <PageContainer
@@ -31,7 +54,7 @@ export default function MentorFeedbackPage() {
                                 {latestSession ? (
                                     <>
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <Badge className={sentimentClasses[latestSession.sentiment]}>
+                                            <Badge className={sentimentClasses[latestSession.sentiment] || sentimentClasses.Positive}>
                                                 {latestSession.sentiment}
                                             </Badge>
                                             <span className="text-xs text-muted-foreground">{latestSession.date}</span>
@@ -53,8 +76,8 @@ export default function MentorFeedbackPage() {
                             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
                                 <div className="rounded-xl border bg-background p-4">
                                     <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Mentor</p>
-                                    <p className="mt-2 font-semibold">{scholarProfile.mentor}</p>
-                                    <p className="text-sm text-muted-foreground">{scholarProfile.mentorTitle}</p>
+                                    <p className="mt-2 font-semibold">{mentorName}</p>
+                                    <p className="text-sm text-muted-foreground">{mentorTitle}</p>
                                 </div>
                                 <div className="rounded-xl border bg-background p-4">
                                     <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Next review focus</p>
@@ -75,13 +98,13 @@ export default function MentorFeedbackPage() {
                             <CardDescription>Historical mentor sessions and follow-up guidance.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-5">
-                            {mentorSessions.map((session, index) => (
+                            {sessions.map((session: any, index: number) => (
                                 <div key={session.id}>
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
                                             <div className="flex flex-wrap items-center gap-2">
                                                 <p className="font-semibold">{session.theme}</p>
-                                                <Badge className={sentimentClasses[session.sentiment]}>
+                                                <Badge className={sentimentClasses[session.sentiment] || sentimentClasses.Positive}>
                                                     {session.sentiment}
                                                 </Badge>
                                             </div>
@@ -96,7 +119,7 @@ export default function MentorFeedbackPage() {
                                         <div className="rounded-xl border bg-muted/20 p-4">
                                             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Strengths</p>
                                             <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
-                                                {session.strengths.map((strength) => (
+                                                {session.strengths.map((strength: string) => (
                                                     <li key={strength} className="flex gap-2">
                                                         <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
                                                         <span>{strength}</span>
@@ -107,7 +130,7 @@ export default function MentorFeedbackPage() {
                                         <div className="rounded-xl border bg-muted/20 p-4">
                                             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Action items</p>
                                             <ul className="mt-2 space-y-2 text-sm text-muted-foreground">
-                                                {session.actionItems.map((item) => (
+                                                {session.actionItems.map((item: string) => (
                                                     <li key={item} className="flex gap-2">
                                                         <span className="mt-1 h-1.5 w-1.5 rounded-full bg-primary" />
                                                         <span>{item}</span>
@@ -116,9 +139,14 @@ export default function MentorFeedbackPage() {
                                             </ul>
                                         </div>
                                     </div>
-                                    {index < mentorSessions.length - 1 && <Separator className="mt-5" />}
+                                    {index < sessions.length - 1 && <Separator className="mt-5" />}
                                 </div>
                             ))}
+                            {sessions.length === 0 && (
+                                <div className="text-sm text-muted-foreground text-center py-12 border border-dashed rounded-xl">
+                                    No mentor feedback logs found.
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -133,13 +161,13 @@ export default function MentorFeedbackPage() {
                             </CardHeader>
                             <CardContent className="space-y-3">
                                 {latestSession ? (
-                                    latestSession.actionItems.map((item) => (
+                                    latestSession.actionItems.map((item: string) => (
                                         <div key={item} className="rounded-xl border bg-background p-4 text-sm text-muted-foreground">
                                             {item}
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
+                                    <div className="rounded-xl border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground text-center">
                                         No mentor action items are available yet.
                                     </div>
                                 )}

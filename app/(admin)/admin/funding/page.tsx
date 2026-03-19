@@ -16,27 +16,52 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { AlertCircle, Banknote, Briefcase, WalletCards } from "lucide-react";
-import {
-    adminFundingDistribution,
-    adminFundingLedger,
-    adminFundingTotals,
-    sponsorFocusMix,
-} from "@/mock-data/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAdminFundingLedger } from "@/lib/supabase/actions";
+import { redirect } from "next/navigation";
 
-const fundingMetrics = [
-    { title: "Committed", value: adminFundingTotals.committed, description: "Approved programme and sponsor funding", icon: WalletCards },
-    { title: "Disbursed", value: adminFundingTotals.disbursed, description: "Released across active programme lines", icon: Banknote },
-    { title: "Reserved", value: adminFundingTotals.reserved, description: "Held for onboarding and future releases", icon: Briefcase },
-    { title: "Flagged", value: adminFundingTotals.flagged, description: "Needs compliance or sponsor follow-up", icon: AlertCircle },
-];
-
-function getFundingStatusClass(status: "Committed" | "Disbursed" | "Flagged") {
-    if (status === "Disbursed") return "bg-emerald-100 text-emerald-800";
-    if (status === "Committed") return "bg-blue-100 text-blue-800";
+function getFundingStatusClass(status: string) {
+    if (status === "completed" || status === "Disbursed") return "bg-emerald-100 text-emerald-800";
+    if (status === "pending" || status === "Committed") return "bg-blue-100 text-blue-800";
     return "bg-red-100 text-red-800";
 }
 
-export default function FundingManagementPage() {
+export default async function FundingManagementPage() {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        redirect("/login");
+    }
+
+    const ledger = await getAdminFundingLedger();
+
+    const committed = ledger.filter((l: any) => l.status === "pending" || l.status === "Committed").reduce((acc: number, l: any) => acc + Number(l.amount), 0);
+    const disbursed = ledger.filter((l: any) => l.status === "completed" || l.status === "Disbursed").reduce((acc: number, l: any) => acc + Number(l.amount), 0);
+    const flagged = ledger.filter((l: any) => l.status === "flagged" || l.status === "Flagged").reduce((acc: number, l: any) => acc + Number(l.amount), 0);
+    const reserved = 640000000; // Mock or future: fetch from treasury table
+
+    const fundingMetrics = [
+        { title: "Committed", value: `N${(committed / 1000000000).toFixed(2)}B`, description: "Approved sponsor funding", icon: WalletCards },
+        { title: "Disbursed", value: `N${(disbursed / 1000000000).toFixed(2)}B`, description: "Released across active lines", icon: Banknote },
+        { title: "Reserved", value: `N${(reserved / 1000000).toFixed(0)}M`, description: "Held for future releases", icon: Briefcase },
+        { title: "Flagged", value: `N${(flagged / 1000000).toFixed(0)}M`, description: "Needs compliance follow-up", icon: AlertCircle },
+    ];
+
+    const programDistribution = ledger.reduce((acc: any, curr: any) => {
+        const progName = curr.programs?.name || "Other";
+        acc[progName] = (acc[progName] || 0) + Number(curr.amount);
+        return acc;
+    }, {});
+
+    const distributionItems = Object.entries(programDistribution).map(([label, value]: [string, any], index) => ({
+        label,
+        value: Number(value),
+        color: ["#0f766e", "#0284c7", "#d97706", "#dc2626", "#475569"][index % 5],
+        description: `Total funding for ${label}`,
+        meta: `N${(Number(value) / 1000000).toFixed(0)}M`
+    }));
+
     return (
         <PageContainer
             title="Funding Management"
@@ -61,28 +86,31 @@ export default function FundingManagementPage() {
                     ))}
                 </div>
 
-                <div className="grid gap-6 xl:grid-cols-2">
+                <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
                     <Card className="border-border/60">
                         <CardHeader>
-                            <CardTitle>Funding Distribution</CardTitle>
-                            <CardDescription>How committed funding is split across scholarships, operations, and delivery support.</CardDescription>
+                            <CardTitle>Programme Funding Mix</CardTitle>
+                            <CardDescription>How committed funding is split across active programme lines.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <DonutBreakdownChart
-                                items={adminFundingDistribution}
+                                items={distributionItems}
                                 totalLabel="Committed"
-                                totalValue={adminFundingTotals.committed}
+                                totalValue={`N${(committed / 1000000000).toFixed(2)}B`}
                             />
                         </CardContent>
                     </Card>
 
                     <Card className="border-border/60">
                         <CardHeader>
-                            <CardTitle>Sponsor Focus Mix</CardTitle>
-                            <CardDescription>Where sponsor capital is currently concentrated across the platform.</CardDescription>
+                            <CardTitle>Sponsor Contribution Status</CardTitle>
+                            <CardDescription>Capital concentration by major donor categories.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <HorizontalBarChart items={sponsorFocusMix} valueSuffix="%" />
+                            <HorizontalBarChart
+                                items={distributionItems.slice(0, 4)}
+                                valueSuffix="M"
+                            />
                         </CardContent>
                     </Card>
                 </div>
@@ -99,17 +127,19 @@ export default function FundingManagementPage() {
                                     <TableHead>Programme</TableHead>
                                     <TableHead>Sponsor</TableHead>
                                     <TableHead>Amount</TableHead>
-                                    <TableHead>Window</TableHead>
+                                    <TableHead>Date</TableHead>
                                     <TableHead>Status</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {adminFundingLedger.map((entry) => (
-                                    <TableRow key={`${entry.programme}-${entry.sponsor}`}>
-                                        <TableCell>{entry.programme}</TableCell>
-                                        <TableCell>{entry.sponsor}</TableCell>
-                                        <TableCell>{entry.amount}</TableCell>
-                                        <TableCell>{entry.window}</TableCell>
+                                {ledger.map((entry: any) => (
+                                    <TableRow key={entry.id}>
+                                        <TableCell>{entry.programs?.name || "—"}</TableCell>
+                                        <TableCell>
+                                            {entry.profiles?.first_name} {entry.profiles?.last_name}
+                                        </TableCell>
+                                        <TableCell>N{Number(entry.amount).toLocaleString()}</TableCell>
+                                        <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
                                         <TableCell>
                                             <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${getFundingStatusClass(entry.status)}`}>
                                                 {entry.status}
@@ -117,6 +147,13 @@ export default function FundingManagementPage() {
                                         </TableCell>
                                     </TableRow>
                                 ))}
+                                {ledger.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="text-center py-6 text-muted-foreground text-sm">
+                                            No funding records found in the ledger.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
                             </TableBody>
                         </Table>
                     </CardContent>

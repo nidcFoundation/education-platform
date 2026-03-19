@@ -1,157 +1,158 @@
 import { PageContainer } from "@/components/layout/page-container";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
-import { FileText, ShieldCheck } from "lucide-react";
-import { scholarDocuments } from "@/mock-data/scholar";
+import { FileText, Shield, Upload } from "lucide-react";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getScholarDocuments } from "@/lib/supabase/actions";
+import { redirect } from "next/navigation";
 
-const documentStatusClasses = {
-    verified: "bg-emerald-100 text-emerald-800 hover:bg-emerald-100",
-    pending: "bg-amber-100 text-amber-800 hover:bg-amber-100",
-    expiring: "bg-red-100 text-red-800 hover:bg-red-100",
-};
+export default async function DocumentsPage() {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
 
-export default function DocumentsPage() {
-    return (
-      <PageContainer
-        title="Documents"
-        description="Manage programme, academic, and placement documents tied to your scholar record."
-        action={<Button>Upload New Document</Button>}
-      >
-        <div className="space-y-6">
+  if (!user) {
+    redirect("/login");
+  }
+
+  const scholarDocuments = await getScholarDocuments(user.id);
+
+  return (
+    <PageContainer
+      title="Documents & Compliance"
+      description="Manage your scholarship records, identity verification, and programme compliance documents."
+      action={
+        <Button className="gap-2">
+          <Upload className="h-4 w-4" />
+          Upload Document
+        </Button>
+      }
+    >
+      <div className="space-y-6">
+        <div className="grid gap-6 md:grid-cols-2">
           <Card className="border-border/60">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-primary" />
-                Document Register
-              </CardTitle>
-              <CardDescription>
-                Verification status, ownership, and expiry tracking for all
-                uploaded records.
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div className="space-y-1.5">
+                <CardTitle className="text-base">Identity & Profile</CardTitle>
+                <CardDescription>
+                  Verified records for account standing.
+                </CardDescription>
+              </div>
+              <Shield className="h-5 w-5 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Document</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Updated</TableHead>
-                    <TableHead>Expires</TableHead>
-                    <TableHead>Owner</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {scholarDocuments.map((document) => (
-                    <TableRow key={document.id}>
-                      <TableCell className="font-medium">
-                        {document.name}
-                      </TableCell>
-                      <TableCell>{document.type}</TableCell>
-                      <TableCell>{document.updatedOn}</TableCell>
-                      <TableCell>{document.expiresOn}</TableCell>
-                      <TableCell>{document.owner}</TableCell>
-                      <TableCell>
-                        <Badge
-                          className={documentStatusClasses[document.status]}
-                        >
-                          {document.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
+              <div className="flex flex-col gap-3">
+                {scholarDocuments
+                  .filter((doc: any) => doc.type === "Identity" || doc.type === "Compliance")
+                  .map((doc: any) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between rounded-xl border bg-muted/20 p-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">{doc.name}</span>
+                      </div>
+                      <StatusBadge status={doc.status} />
+                    </div>
                   ))}
-                </TableBody>
-              </Table>
+                {scholarDocuments.filter((doc: any) => doc.type === "Identity" || doc.type === "Compliance").length === 0 && (
+                  <p className="text-sm text-muted-foreground italic">No identity documents found.</p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card className="border-border/60">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-primary" />
-                  Compliance Notes
-                </CardTitle>
-                <CardDescription>
-                  What needs attention to keep your scholar record healthy.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {[
-                  "Renew the national ID before April 21, 2026 to avoid placement verification delays.",
-                  "Placement letter is still pending internal validation from the placement office.",
-                  "Transcript and award letter are verified and available for partner review.",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/60">
-              <CardHeader>
-                <CardTitle>Required Package</CardTitle>
-                <CardDescription>
-                  Core records typically reviewed before placement matching.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {[
-                  "Scholarship award letter",
-                  "Latest university transcript",
-                  "National ID",
-                  "Placement or internship letter",
-                  "Quarterly impact evidence pack",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-xl border bg-background p-4 text-sm text-muted-foreground"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/60">
-              <CardHeader>
-                <CardTitle>Required Package</CardTitle>
-                <CardDescription>
-                  Core records typically reviewed before placement matching.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {[
-                  "Scholarship award letter",
-                  "Latest university transcript",
-                  "National ID",
-                  "Placement or internship letter",
-                  "Quarterly impact evidence pack",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-xl border bg-background p-4 text-sm text-muted-foreground"
-                  >
-                    {item}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+          <Card className="border-border/60">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div className="space-y-1.5">
+                <CardTitle className="text-base">Academic Records</CardTitle>
+                <CardDescription>Official transcripts and enrollment proofs.</CardDescription>
+              </div>
+              <FileText className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-3">
+                {scholarDocuments
+                  .filter((doc: any) => doc.type === "Academic")
+                  .map((doc: any) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center justify-between rounded-xl border bg-muted/20 p-3"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">{doc.name}</span>
+                      </div>
+                      <StatusBadge status={doc.status} />
+                    </div>
+                  ))}
+                {scholarDocuments.filter((doc: any) => doc.type === "Academic").length === 0 && (
+                  <p className="text-sm text-muted-foreground italic">No academic records found.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </PageContainer>
-    );
+
+        <Card className="border-border/60">
+          <CardHeader>
+            <CardTitle>Document Ledger</CardTitle>
+            <CardDescription>
+              Full register of all uploaded files and verification status.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Document Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Updated On</TableHead>
+                  <TableHead>Expires On</TableHead>
+                  <TableHead>Owner</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {scholarDocuments.map((doc: any) => (
+                  <TableRow key={doc.id}>
+                    <TableCell className="font-medium">{doc.name}</TableCell>
+                    <TableCell>{doc.type}</TableCell>
+                    <TableCell>{new Date(doc.updated_on).toLocaleDateString()}</TableCell>
+                    <TableCell>{doc.expires_on ? new Date(doc.expires_on).toLocaleDateString() : "—"}</TableCell>
+                    <TableCell>{doc.owner}</TableCell>
+                    <TableCell>
+                      <StatusBadge status={doc.status} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {scholarDocuments.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-6 text-muted-foreground text-sm">
+                      No documents recorded in the ledger.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    </PageContainer>
+  );
 }
