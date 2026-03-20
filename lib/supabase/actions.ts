@@ -41,6 +41,20 @@ function getApplicationPermissionErrorMessage(rawMessage?: string, action: "save
     return rawMessage || "An unexpected error occurred.";
 }
 
+function getProfileSaveErrorMessage(rawMessage?: string) {
+    const message = (rawMessage || "").toLowerCase();
+    const isPermissionError =
+        message.includes("permission denied") ||
+        message.includes("row-level security") ||
+        message.includes("violates row-level security policy");
+
+    if (isPermissionError) {
+        return "Unable to save profile details right now due to access restrictions.";
+    }
+
+    return "Unable to save profile details right now. Please try again.";
+}
+
 export async function getScholarDashboardData(scholarId: string) {
     const supabase = await createSupabaseServerClient();
 
@@ -535,23 +549,30 @@ export async function saveApplicationStep(
     }
 
     if (step === 1) {
-        const firstName = typeof stepData["firstName"] === "string" ? stepData["firstName"].trim() : "";
-        const lastName = typeof stepData["lastName"] === "string" ? stepData["lastName"].trim() : "";
-        const phone = typeof stepData["phone"] === "string" ? stepData["phone"].trim() : "";
-        const stateOfOrigin = typeof stepData["stateOfOrigin"] === "string" ? stepData["stateOfOrigin"].trim() : "";
+        const profileUpdatePayload: Record<string, string> = {};
 
-        const { error: profileUpdateError } = await supabase
-            .from("profiles")
-            .update({
-                first_name: firstName,
-                last_name: lastName,
-                phone,
-                state_of_origin: stateOfOrigin,
-            })
-            .eq("id", user.id);
+        const addIfPresentString = (inputKey: string, profileKey: string) => {
+            if (!Object.prototype.hasOwnProperty.call(stepData, inputKey)) return;
+            const rawValue = stepData[inputKey];
+            if (typeof rawValue !== "string") return;
+            profileUpdatePayload[profileKey] = rawValue.trim();
+        };
 
-        if (profileUpdateError) {
-            return { error: profileUpdateError.message };
+        addIfPresentString("firstName", "first_name");
+        addIfPresentString("lastName", "last_name");
+        addIfPresentString("phone", "phone");
+        addIfPresentString("stateOfOrigin", "state_of_origin");
+
+        if (Object.keys(profileUpdatePayload).length > 0) {
+            const { error: profileUpdateError } = await supabase
+                .from("profiles")
+                .update(profileUpdatePayload)
+                .eq("id", user.id);
+
+            if (profileUpdateError) {
+                console.error("Error updating applicant profile during step save:", profileUpdateError);
+                return { error: getProfileSaveErrorMessage(profileUpdateError.message) };
+            }
         }
     }
 
