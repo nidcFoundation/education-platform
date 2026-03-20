@@ -12,6 +12,7 @@ import { applicationSteps } from "@/lib/constants/application";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { saveApplicationStep } from "@/lib/supabase/actions";
 
 interface EssayFormProps {
     application: any;
@@ -62,15 +63,38 @@ export function EssayForm({ application }: EssayFormProps) {
         setFormData((prev: any) => ({ ...prev, [id]: value }));
     };
 
-    const handleSave = async (e: React.FormEvent, isNext = false) => {
+    const handleSave = async (e: React.FormEvent | React.MouseEvent<HTMLButtonElement>, isNext = false) => {
         e.preventDefault();
+
+        // Validate all essays are within [wordMin, wordMax] before saving
+        for (const essay of essayPrompts) {
+            const count = wordCount(formData[essay.id] || "");
+            if (count < essay.wordMin) {
+                toast.error(`"${essay.label}" needs at least ${essay.wordMin} words (${count} written).`);
+                return;
+            }
+            if (count > essay.wordMax) {
+                toast.error(`"${essay.label}" exceeds the ${essay.wordMax}-word limit (${count} written).`);
+                return;
+            }
+        }
+
         setLoading(true);
-        // TODO: Implement saveApplicationStep server action
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            const { error } = await saveApplicationStep(3, formData, isNext);
+            if (error) {
+                toast.error(error);
+                return;
+            }
+
             toast.success("Draft saved");
             if (isNext) router.push("/application/step-4");
-        }, 800);
+            else router.refresh();
+        } catch {
+            toast.error("Failed to save progress. Please try again.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -129,7 +153,12 @@ export function EssayForm({ application }: EssayFormProps) {
                                         <span className="flex items-center gap-1.5">
                                             <Info className="h-3 w-3" /> Progress is tracked
                                         </span>
-                                        <span className={`font-medium ${count < essay.wordMin ? "text-amber-600" : "text-emerald-600"}`}>
+                                        <span className={`font-medium ${count > essay.wordMax
+                                                ? "text-red-600"
+                                                : count < essay.wordMin
+                                                    ? "text-amber-600"
+                                                    : "text-emerald-600"
+                                            }`}>
                                             {count} / {essay.wordMin}–{essay.wordMax} words
                                         </span>
                                     </div>

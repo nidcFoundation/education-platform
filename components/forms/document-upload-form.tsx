@@ -13,6 +13,7 @@ import type { DocumentStatus, DocumentType } from "@/types";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 interface DocumentUploadFormProps {
     documents: any[];
@@ -45,14 +46,100 @@ export function DocumentUploadForm({ documents }: DocumentUploadFormProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
 
-    const handleUpload = async (type: string) => {
-        toast.info(`Uploading ${type}...`);
-        // TODO: Implement actual upload logic
+    const handleUpload = (type: string) => {
+        if (loading) return;
+
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png";
+        input.onchange = async () => {
+            const file = input.files?.[0];
+            if (!file) return;
+
+            const maxSize = 5 * 1024 * 1024;
+            const allowedTypes = new Set(["application/pdf", "image/jpeg", "image/png"]);
+
+            if (!allowedTypes.has(file.type)) {
+                toast.error("Invalid file format. Please upload PDF, JPG, or PNG.");
+                return;
+            }
+
+            if (file.size > maxSize) {
+                toast.error("File is too large. Maximum size is 5MB.");
+                return;
+            }
+
+            setLoading(true);
+            toast.info(`Uploading ${file.name}...`);
+
+            try {
+                const supabase = getSupabaseBrowserClient();
+                const { data: auth, error: authError } = await supabase.auth.getUser();
+
+                if (authError || !auth.user) {
+                    toast.error("You must be signed in to upload documents.");
+                    return;
+                }
+
+                const { error } = await supabase.from("documents").insert({
+                    scholar_id: auth.user.id,
+                    name: file.name,
+                    type,
+                    status: "pending",
+                    updated_on: new Date().toISOString().slice(0, 10),
+                    owner: "Applicant",
+                });
+
+                if (error) {
+                    toast.error("Upload failed.", { description: error.message });
+                    return;
+                }
+
+                toast.success("Document uploaded successfully.");
+                router.refresh();
+            } catch {
+                toast.error("Upload failed. Please try again.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        input.click();
     };
 
     const handleDelete = async (id: string) => {
+        if (loading) return;
+
+        setLoading(true);
         toast.info("Deleting document...");
-        // TODO: Implement deletion logic
+
+        try {
+            const supabase = getSupabaseBrowserClient();
+            const { data: auth, error: authError } = await supabase.auth.getUser();
+
+            if (authError || !auth.user) {
+                toast.error("You must be signed in to delete documents.");
+                return;
+            }
+
+            const { error } = await supabase
+                .from("documents")
+                .delete()
+                .eq("id", id)
+                .eq("scholar_id", auth.user.id);
+
+            if (error) {
+                toast.error("Delete failed.", { description: error.message });
+                return;
+            }
+
+            toast.success("Document deleted successfully.");
+            router.refresh();
+        } catch {
+            toast.error("Delete failed. Please try again.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
