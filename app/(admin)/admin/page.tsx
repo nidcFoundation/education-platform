@@ -27,7 +27,7 @@ import {
     Users,
 } from "lucide-react";
 import { getAdminDashboardData } from "@/lib/supabase/actions";
-import { adminFundingDistribution, adminSectionLinks } from "@/mock-data/admin";
+import { adminFundingDistribution, adminSectionLinks } from "@/lib/constants";
 
 const dashboardIcons = [
     Users,
@@ -39,16 +39,22 @@ const dashboardIcons = [
 ];
 
 export default async function AdminDashboardPage() {
-    const { counts, applications, cohorts, programs } = await getAdminDashboardData();
+    const { counts, totalFunding, applications, cohorts, programs } = await getAdminDashboardData();
 
     const totalCohortPopulation = cohorts.reduce((sum: number, cohort: any) => sum + (cohort.active_scholars_count || 0), 0);
+
+    const formatCurrency = (amount: number) => {
+        if (amount >= 1e9) return `₦${(amount / 1e9).toFixed(2)}B`;
+        if (amount >= 1e6) return `₦${(amount / 1e6).toFixed(1)}M`;
+        return `₦${amount.toLocaleString()}`;
+    };
 
     const adminDashboardMetrics = [
         { title: "Active Scholars", value: counts.scholars.toLocaleString(), description: "Currently enrolled", trend: { value: 12, isPositive: true } },
         { title: "Review Queue", value: counts.applicants.toLocaleString(), description: "Applications pending", trend: { value: 5, isPositive: false } },
         { title: "Cohort Health", value: "94%", description: "Average progress score", trend: { value: 2, isPositive: true } },
         { title: "Active Programs", value: programs.length.toString(), description: "Deployment tracks", trend: { value: 0, isPositive: true } },
-        { title: "Funding Deployed", value: "₦42.8M", description: "Disbursed this cycle", trend: { value: 8, isPositive: true } },
+        { title: "Funding Deployed", value: formatCurrency(totalFunding), description: "Total committed value", trend: { value: 8, isPositive: true } },
         { title: "National Impact", value: "1.2k", description: "Beneficiaries reached", trend: { value: 15, isPositive: true } },
     ];
 
@@ -59,7 +65,7 @@ export default async function AdminDashboardPage() {
     }));
 
     const adminProgramPerformance = programs.slice(0, 5).map((p: any) => ({
-        label: p.title,
+        label: p.name,
         value: p.completion_rate || 0,
         color: "var(--primary)"
     }));
@@ -207,24 +213,41 @@ export default async function AdminDashboardPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {applications.slice(0, 4).map((application: any) => (
-                                        <TableRow key={application.id}>
-                                            <TableCell>
-                                                <div>
-                                                    <p className="font-medium">{application.profiles?.first_name} {application.profiles?.last_name}</p>
-                                                    <p className="text-xs text-muted-foreground">{application.id.slice(0, 8)}</p>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>{application.program_id?.slice(0, 8) || "N/A"}</TableCell>
-                                            <TableCell>
-                                                <ApplicationStatusBadge status={application.status} />
-                                            </TableCell>
-                                            <TableCell>{new Date(application.created_at).toLocaleDateString()}</TableCell>
-                                        </TableRow>
-                                    ))}
+                                    {applications.slice(0, 4).map((application: any) => {
+                                        const firstName = typeof application.profiles?.first_name === "string"
+                                            ? application.profiles.first_name.trim()
+                                            : "";
+                                        const lastName = typeof application.profiles?.last_name === "string"
+                                            ? application.profiles.last_name.trim()
+                                            : "";
+                                        const emailLocalPart = typeof application.profiles?.email === "string"
+                                            ? application.profiles.email.split("@")[0]
+                                            : "";
+                                        const displayName = [firstName, lastName].filter(Boolean).join(" ") || emailLocalPart || "Applicant";
+
+                                        return (
+                                            <TableRow key={application.id}>
+                                                <TableCell>
+                                                    <div>
+                                                        <p className="font-medium text-sm">{displayName}</p>
+                                                        <p className="text-xs text-muted-foreground">{application.id.slice(0, 8)}</p>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-xs max-w-[150px] truncate">
+                                                    {application.programs?.name || "Unassigned"}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <ApplicationStatusBadge status={application.status} />
+                                                </TableCell>
+                                                <TableCell className="text-xs text-muted-foreground italic">
+                                                    {new Date(application.created_at).toLocaleDateString()}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
                                     {applications.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={4} className="text-center text-muted-foreground">No applications in queue.</TableCell>
+                                            <TableCell colSpan={4} className="text-center text-muted-foreground py-8">No applications in queue.</TableCell>
                                         </TableRow>
                                     )}
                                 </TableBody>

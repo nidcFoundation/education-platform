@@ -3,8 +3,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Building2, Globe2, Landmark, Handshake, ArrowRight } from "lucide-react";
-import { mockPartners } from "@/mock-data";
+import { getPublicHomeData } from "@/lib/supabase/actions";
 import Link from "next/link";
+
+interface Partner {
+    id: string;
+    name?: string;
+    first_name?: string;
+    last_name?: string;
+    type?: string;
+    tier?: string;
+}
 
 const typeIconMap: Record<string, typeof Globe2> = {
     "Academic Institution": Building2,
@@ -22,7 +31,9 @@ const tierColorMap: Record<string, string> = {
     "Development Partner": "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400",
 };
 
-export default function PartnersPage() {
+export default async function PartnersPage() {
+    const { partners } = await getPublicHomeData();
+
     return (
         <div className="flex flex-col w-full">
             {/* Hero */}
@@ -62,10 +73,11 @@ export default function PartnersPage() {
             </SectionWrapper>
 
             {/* Partner Directory */}
-            <SectionWrapper title="Partner Directory" className="bg-muted/20 border-t" description="Our growing coalition of 45 institutional partners across academia, government, and industry.">
+            <SectionWrapper title="Partner Directory" className="bg-muted/20 border-t" description="Our growing coalition of institutional partners across academia, government, and industry.">
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-8">
-                    {mockPartners.map((partner) => {
-                        const Icon = typeIconMap[partner.type] ?? Globe2;
+                    {partners.map((partner: Partner) => {
+                        const Icon = (partner.type && typeIconMap[partner.type]) || Globe2;
+                        const partnerName = partner.name || `${partner.first_name || ""} ${partner.last_name || ""}`.trim() || "Anonymous Partner";
                         return (
                             <Card key={partner.id} className="border-border/50 hover:border-primary/40 transition-colors">
                                 <CardContent className="pt-6 flex items-start gap-4">
@@ -73,16 +85,19 @@ export default function PartnersPage() {
                                         <Icon className="h-5 w-5 text-primary" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-semibold leading-tight mb-1">{partner.name}</h3>
-                                        <p className="text-xs text-muted-foreground mb-2">{partner.type} · {partner.location}</p>
-                                        <Badge variant="outline" className={`text-xs ${tierColorMap[partner.tier] ?? ""}`}>
-                                            {partner.tier}
+                                        <h3 className="font-semibold leading-tight mb-1">{partnerName}</h3>
+                                        <p className="text-xs text-muted-foreground mb-2">{partner.type || "Institutional Partner"}</p>
+                                        <Badge variant="outline" className={`text-xs ${(partner.tier && tierColorMap[partner.tier]) || ""}`}>
+                                            {partner.tier || "Strategic Partner"}
                                         </Badge>
                                     </div>
                                 </CardContent>
                             </Card>
                         );
                     })}
+                    {partners.length === 0 && (
+                        <p className="col-span-full text-center text-muted-foreground py-12">No institutional partners listed yet.</p>
+                    )}
                 </div>
             </SectionWrapper>
 
@@ -111,7 +126,7 @@ export default function PartnersPage() {
             </SectionWrapper>
 
             {/* Become a Partner CTA */}
-            <section id="become-partner" className="py-20 bg-primary text-primary-foreground">
+            <section id="become-partner" className="py-20 bg-primary text-primary-foreground border-t">
                 <div className="container mx-auto px-4 text-center max-w-3xl space-y-6">
                     <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Partner With Us</h2>
                     <p className="text-lg text-primary-foreground/80">

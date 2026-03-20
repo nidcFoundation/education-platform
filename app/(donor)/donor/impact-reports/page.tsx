@@ -4,7 +4,7 @@ import { PageContainer } from "@/components/layout/page-container";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, Target, TrendingUp } from "lucide-react";
-import { donorImpactReports, impactMetrics, programGrowth } from "@/mock-data/donor";
+import { donorImpactReports, impactMetrics, programGrowth } from "@/lib/constants";
 
 export default function ImpactReportsPage() {
     return (
@@ -21,7 +21,7 @@ export default function ImpactReportsPage() {
                             title={metric.label}
                             value={metric.value}
                             description={metric.description}
-                            icon={[Target, TrendingUp, FileText, FileText][index]}
+                            icon={[Target, TrendingUp, FileText, FileText][index % 4]}
                         />
                     ))}
                 </div>

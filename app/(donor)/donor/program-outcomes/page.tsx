@@ -14,12 +14,17 @@ import {
 } from "@/components/ui/table";
 import { GraduationCap, Target } from "lucide-react";
 import {
-    cohortSuccessRates,
     programGrowth,
     programOutcomeHighlights,
     scholarOutcomeBreakdown,
     sectorPlacementBreakdown,
-} from "@/mock-data/donor";
+} from "@/lib/constants";
+
+const cohortSuccessRates = [
+    { cohort: "2023", retention: 98, graduation: 96, placement: 92 },
+    { cohort: "2024", retention: 100, graduation: 0, placement: 0 },
+    { cohort: "2025", retention: 100, graduation: 0, placement: 0 },
+];
 
 export default function ProgramOutcomesPage() {
     return (

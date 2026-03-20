@@ -14,31 +14,23 @@ import {
     ChevronDown,
     AlertCircle,
 } from "lucide-react";
-import { mockFAQs } from "@/mock-data";
+import {
+    eligibilityRequirements,
+    requiredDocuments as documentsData,
+    applicationTimeline,
+    publicFAQs as mockFAQs,
+} from "@/lib/constants";
 
-const eligibilityRequirements = [
-    { label: "Citizenship", desc: "Must be a Nigerian citizen with valid identification." },
-    { label: "Age Range", desc: "Between 16 and 25 years at the time of application." },
-    { label: "Academic Record", desc: "Minimum of 5 A-level credits (or equivalent), including English and Mathematics, obtained in a single sitting." },
-    { label: "Character", desc: "Demonstrated integrity, community leadership, and commitment to national development." },
-    { label: "Discipline Fit", desc: "Strong interest and aptitude in at least one of the four strategic focus areas." },
-];
+const iconMap: Record<string, any> = {
+    FileText,
+    Users,
+    GraduationCap,
+};
 
-const requiredDocuments = [
-    { icon: FileText, label: "Statement of Purpose", desc: "500–800 word essay on your vision for national impact." },
-    { icon: FileText, label: "Academic Transcripts", desc: "Certified copies of all academic results from secondary school." },
-    { icon: Users, label: "Two Reference Letters", desc: "From a teacher and a community/civic leader (not family members)." },
-    { icon: FileText, label: "Government-Issued ID", desc: "National ID card, birth certificate, or valid passport." },
-    { icon: GraduationCap, label: "JAMB Result (if applicable)", desc: "For applicants targeting undergraduate programs." },
-];
-
-const applicationTimeline = [
-    { phase: "Phase 1", title: "Online Application", date: "Jan – April 30, 2026", isCompleted: true },
-    { phase: "Phase 2", title: "Aptitude Assessment", date: "May 15 – 25, 2026", isCompleted: false, isActive: true },
-    { phase: "Phase 3", title: "Panel Interviews", date: "June 10 – 20, 2026", isCompleted: false },
-    { phase: "Phase 4", title: "Offer Letters Issued", date: "July 1, 2026", isCompleted: false },
-    { phase: "Phase 5", title: "Scholar Onboarding", date: "September 2026", isCompleted: false },
-];
+const requiredDocuments = documentsData.map(doc => ({
+    ...doc,
+    icon: iconMap[doc.icon] || FileText
+}));
 
 export default function ApplyPage() {
     return (

@@ -1,185 +1,27 @@
-"use client";
-
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { ApplicationStepper } from "@/components/forms/application-stepper";
 import { PageContainer } from "@/components/layout/page-container";
-import {
-    ArrowLeft, CheckCircle2, AlertCircle, FileText, GraduationCap, ScrollText, Upload, Edit, Send
-} from "lucide-react";
-import { applicationSteps, mockApplication, mockDocuments } from "@/mock-data/applicant";
-import Link from "next/link";
+import { ApplicationReview } from "@/components/forms/application-review";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { getApplicantDashboardData } from "@/lib/supabase/actions";
+import { buildProfileFallback } from "@/lib/auth/profile-fallback";
 
-function ReviewSection({ title, icon: Icon, editHref, children }: {
-    title: string;
-    icon: typeof CheckCircle2;
-    editHref: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <Card className="border-border/50">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between gap-3 border-b bg-muted/10">
-                <div className="flex items-center gap-2">
-                    <Icon className="h-4 w-4 text-primary" />
-                    <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-                </div>
-                <Link href={editHref}>
-                    <Button variant="ghost" size="sm" className="text-xs h-7 gap-1.5 text-primary">
-                        <Edit className="h-3 w-3" /> Edit
-                    </Button>
-                </Link>
-            </CardHeader>
-            <CardContent className="p-5">{children}</CardContent>
-        </Card>
-    );
-}
+export default async function Step5Review() {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-function InfoRow({ label, value }: { label: string; value?: string }) {
-    return (
-        <div className="flex flex-col sm:flex-row sm:gap-4">
-            <span className="text-xs text-muted-foreground min-w-[180px] shrink-0">{label}</span>
-            <span className="text-sm font-medium">{value || <span className="text-muted-foreground/50 text-xs italic">Not provided</span>}</span>
-        </div>
-    );
-}
+    if (!user) {
+        redirect("/login");
+    }
 
-export default function Step5Review() {
-    const pi = mockApplication.personalInfo;
-    const ab = mockApplication.academicBackground;
+    const { profile, application, documents } = await getApplicantDashboardData(user.id);
+    const resolvedProfile = profile ?? buildProfileFallback(user);
 
     return (
         <PageContainer
             title="Step 5: Review & Submit"
             description="Review all sections carefully before final submission. Once submitted, no changes can be made."
         >
-            <div className="max-w-3xl mx-auto space-y-6">
-                <ApplicationStepper steps={applicationSteps} currentStep={5} />
-
-                {/* Warning */}
-                <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                    <div>
-                        <p className="font-semibold">Final Submission — No Revisions After Submit</p>
-                        <p className="mt-0.5 text-amber-700">
-                            Once you click "Submit Application", your application is locked and forwarded to the NTDI Selection Board. You will not be able to edit any section after submission.
-                        </p>
-                    </div>
-                </div>
-
-                {/* Personal Info Review */}
-                <ReviewSection title="Personal Information" icon={FileText} editHref="/application/step-1">
-                    <div className="space-y-3">
-                        <InfoRow label="Full Name" value={`${pi?.firstName} ${pi?.lastName}`} />
-                        <Separator />
-                        <InfoRow label="Email Address" value={pi?.email} />
-                        <InfoRow label="Phone Number" value={pi?.phone} />
-                        <Separator />
-                        <InfoRow label="Date of Birth" value={pi?.dateOfBirth} />
-                        <InfoRow label="Gender" value={pi?.gender} />
-                        <InfoRow label="NIN" value={pi?.nationalId} />
-                        <Separator />
-                        <InfoRow label="State of Origin" value={pi?.stateOfOrigin} />
-                        <InfoRow label="LGA of Origin" value={pi?.lgaOfOrigin} />
-                        <InfoRow label="Residential Address" value={`${pi?.address}, ${pi?.city}`} />
-                    </div>
-                </ReviewSection>
-
-                {/* Academic Review */}
-                <ReviewSection title="Academic Background" icon={GraduationCap} editHref="/application/step-2">
-                    <div className="space-y-3">
-                        <InfoRow label="Preferred Programme" value={mockApplication.programChoice} />
-                        <Separator />
-                        <InfoRow label="Secondary School" value={ab?.secondarySchool} />
-                        <InfoRow label="WAEC Year / Grade" value={`${ab?.waecYear} — ${ab?.waecGrade}`} />
-                        <InfoRow label="JAMB Score" value={`${ab?.jambScore} (${ab?.jambYear})`} />
-                        <Separator />
-                        <InfoRow label="Institution" value={ab?.institution} />
-                        <InfoRow label="Course" value={ab?.course} />
-                        <InfoRow label="Year" value={ab?.currentYear} />
-                    </div>
-                </ReviewSection>
-
-                {/* Essays Review */}
-                <ReviewSection title="Essays" icon={ScrollText} editHref="/application/step-3">
-                    <div className="space-y-4">
-                        {[
-                            { label: "Why are you applying?", value: mockApplication.essays?.whyApply },
-                            { label: "Your Vision for National Contribution", value: undefined },
-                            { label: "Demonstrated Leadership", value: undefined },
-                            { label: "Long-Term Goals", value: undefined },
-                        ].map((essay, i) => (
-                            <div key={i}>
-                                <p className="text-xs text-muted-foreground mb-1">{essay.label}</p>
-                                {essay.value ? (
-                                    <p className="text-sm line-clamp-3 text-foreground/80 bg-muted/30 p-3 rounded-lg border text-xs leading-relaxed">
-                                        {essay.value}
-                                    </p>
-                                ) : (
-                                    <div className="flex items-center gap-2 text-amber-600 text-xs">
-                                        <AlertCircle className="h-3.5 w-3.5" /> Not completed
-                                    </div>
-                                )}
-                                {i < 3 && <Separator className="mt-4" />}
-                            </div>
-                        ))}
-                    </div>
-                </ReviewSection>
-
-                {/* Documents Review */}
-                <ReviewSection title="Documents" icon={Upload} editHref="/application/step-4">
-                    <div className="space-y-2">
-                        {mockDocuments.map((doc) => (
-                            <div key={doc.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/20">
-                                <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                                <span className="text-sm flex-1 truncate">{doc.name}</span>
-                                <Badge
-                                    variant="outline"
-                                    className={`text-[10px] capitalize shrink-0 ${doc.status === "verified" ? "border-emerald-300 text-emerald-700 bg-emerald-50" :
-                                            doc.status === "pending" ? "border-amber-300 text-amber-700 bg-amber-50" :
-                                                "border-red-300 text-red-700 bg-red-50"
-                                        }`}
-                                >
-                                    {doc.status}
-                                </Badge>
-                            </div>
-                        ))}
-                        <div className="flex items-center gap-2 text-xs text-amber-600 mt-2 pt-2 border-t">
-                            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                            2 required documents still missing — complete before submitting
-                        </div>
-                    </div>
-                </ReviewSection>
-
-                {/* Declaration */}
-                <Card className="border-primary/30 bg-primary/5">
-                    <CardContent className="p-5 space-y-4">
-                        <h3 className="font-bold text-base">Declaration & Agreement</h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                            By submitting this application, I, <strong>{pi?.firstName} {pi?.lastName}</strong>, hereby certify that all information provided is true, accurate, and complete to the best of my knowledge. I understand that any misrepresentation — intentional or otherwise — will result in immediate disqualification and may have legal consequences. I commit to the values of excellence, integrity, and national service that the NTDI represents.
-                        </p>
-                        <div className="flex items-start gap-2">
-                            <input type="checkbox" id="declaration" className="mt-1 accent-primary" />
-                            <label htmlFor="declaration" className="text-sm font-medium cursor-pointer">
-                                I confirm the above declaration and consent to the verification of all information provided.
-                            </label>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Submit Buttons */}
-                <div className="flex flex-col sm:flex-row justify-between gap-4 pb-8">
-                    <Link href="/application/step-4">
-                        <Button variant="outline" className="gap-2 w-full sm:w-auto">
-                            <ArrowLeft className="h-4 w-4" /> Back to Documents
-                        </Button>
-                    </Link>
-                    <Button className="gap-2 font-semibold h-12 px-8 w-full sm:w-auto" size="lg">
-                        <Send className="h-4 w-4" /> Submit Application
-                    </Button>
-                </div>
-            </div>
+            <ApplicationReview profile={resolvedProfile} application={application} documents={documents} />
         </PageContainer>
     );
 }

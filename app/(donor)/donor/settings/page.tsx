@@ -3,13 +3,25 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { donorProfile, donorSettings } from "@/mock-data/donor";
+import { donorSettings } from "@/lib/constants";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getDonorDashboardData } from "@/lib/supabase/actions";
+import { redirect } from "next/navigation";
 
 function getPreferenceId(section: string, label: string) {
     return `${section}-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
 }
 
-export default function DonorSettingsPage() {
+export default async function DonorSettingsPage() {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        redirect("/login");
+    }
+
+    const { profile } = await getDonorDashboardData(user.id);
+
     return (
         <PageContainer
             title="Settings"
@@ -24,7 +36,7 @@ export default function DonorSettingsPage() {
                     <CardContent className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2">
                             <Label htmlFor="org-name">Organisation</Label>
-                            <Input id="org-name" defaultValue={donorSettings.contacts.organization} />
+                            <Input id="org-name" defaultValue={profile.organization || `${profile.first_name} ${profile.last_name}`} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="reporting-contact">Reporting Contact</Label>
@@ -32,14 +44,14 @@ export default function DonorSettingsPage() {
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="donor-email">Email</Label>
-                            <Input id="donor-email" type="email" defaultValue={donorSettings.contacts.email} />
+                            <Input id="donor-email" type="email" defaultValue={profile.email} />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="donor-phone">Phone</Label>
                             <Input id="donor-phone" defaultValue={donorSettings.contacts.phone} />
                         </div>
                         <div className="md:col-span-2 flex justify-end">
-                             <Button disabled aria-disabled="true">Save Profile (coming soon)</Button>
+                            <Button disabled aria-disabled="true">Save Profile (coming soon)</Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -112,7 +124,7 @@ export default function DonorSettingsPage() {
                                 );
                             })}
                             <div className="rounded-xl border bg-background p-4 text-sm text-muted-foreground">
-                                Donor profile: {donorProfile.organization} · Commitment window {donorProfile.pledgeWindow}
+                                Donor profile: {profile.organization || "Private Entity"} · Commitment window {profile.renewal_window || "Rolling"}
                             </div>
                             <div className="flex justify-end">
                                 <Button variant="outline">Save Visibility</Button>

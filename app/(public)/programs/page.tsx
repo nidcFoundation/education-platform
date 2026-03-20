@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Monitor, HeartPulse, Leaf, Cog, ArrowRight, BookOpen, Brain, Briefcase, CheckCircle2 } from "lucide-react";
-import { mockPrograms } from "@/mock-data";
+import { getPublicPrograms } from "@/lib/supabase/actions";
 
 const iconMap: Record<string, typeof Monitor> = {
     tech: Monitor,
@@ -21,7 +21,9 @@ const scholarExpectations = [
     { title: "Community Engagement", desc: "Lead at least one verified community impact project per academic year." },
 ];
 
-export default function ProgramsPage() {
+export default async function ProgramsPage() {
+    const programs = await getPublicPrograms();
+
     return (
         <div className="flex flex-col w-full">
             {/* Hero */}
@@ -42,8 +44,10 @@ export default function ProgramsPage() {
             {/* Focus Area Grid */}
             <SectionWrapper title="Strategic Disciplines" className="bg-background">
                 <div className="grid md:grid-cols-2 gap-8 mt-8">
-                    {mockPrograms.map((program) => {
-                        const Icon = iconMap[program.id] ?? Monitor;
+                    {programs.map((program) => {
+                        const focusAreaId = program.focusAreaId ?? program.focus_area_id ?? "";
+                        const categoryKey = (typeof focusAreaId === "string" ? focusAreaId.split("-")[1] : "") || "tech";
+                        const Icon = iconMap[categoryKey] ?? Monitor;
                         return (
                             <Card key={program.id} className="border-border/50 bg-card hover:shadow-lg transition-shadow overflow-hidden">
                                 <CardHeader className="pb-4">
@@ -55,29 +59,33 @@ export default function ProgramsPage() {
                                             {program.status}
                                         </Badge>
                                     </div>
-                                    <CardTitle className="text-2xl">{program.title}</CardTitle>
+                                    <CardTitle className="text-2xl">{program.name}</CardTitle>
                                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1">
-                                        <span>{program.location}</span>
+                                        <span>{program.campuses?.join(", ") || "Nationwide"}</span>
                                         <span>·</span>
-                                        <span>{program.duration}</span>
+                                        <span>4 Years</span>
                                         <span>·</span>
-                                        <span>{program.capacity} scholars</span>
+                                        <span>{program.capacity || 200} scholars</span>
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-6">
                                     <p className="text-muted-foreground leading-relaxed">{program.description}</p>
                                     <div className="space-y-2">
-                                        <h4 className="text-xs font-bold uppercase tracking-widest text-primary">Core Modules</h4>
+                                        <h4 className="text-xs font-bold uppercase tracking-widest text-primary">Key Focus</h4>
                                         <div className="flex flex-wrap gap-2">
-                                            {program.modules.map((mod, j) => (
-                                                <Badge key={j} variant="secondary" className="bg-muted text-muted-foreground rounded-md">{mod}</Badge>
+                                            {program.tags?.map((tag: string, j: number) => (
+                                                <Badge key={j} variant="secondary" className="bg-muted text-muted-foreground rounded-md">{tag}</Badge>
                                             ))}
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <h4 className="text-xs font-bold uppercase tracking-widest text-emerald-600">Program Outcomes</h4>
+                                        <h4 className="text-xs font-bold uppercase tracking-widest text-emerald-600">Expected Outcomes</h4>
                                         <ul className="space-y-1.5">
-                                            {program.outcomes.map((outcome, j) => (
+                                            {[
+                                                "Advanced technical mastery in designated field",
+                                                "Socio-economic impact via service deployment",
+                                                "Strategic leadership capacity building"
+                                            ].map((outcome, j) => (
                                                 <li key={j} className="flex items-start gap-2 text-sm text-muted-foreground">
                                                     <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
                                                     {outcome}
@@ -89,6 +97,9 @@ export default function ProgramsPage() {
                             </Card>
                         );
                     })}
+                    {programs.length === 0 && (
+                        <p className="col-span-full text-center text-muted-foreground py-12">No programs currently listed.</p>
+                    )}
                 </div>
             </SectionWrapper>
 

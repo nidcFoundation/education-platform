@@ -3,6 +3,18 @@
 import { createSupabaseServerClient } from "./server";
 import { Scholar, Milestone, Announcement, ImpactMetric, FundingRecord } from "@/types";
 
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+function getDaysUntilDueDate(dueDate: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+
+    return Math.ceil((due.getTime() - today.getTime()) / MS_PER_DAY);
+}
+
 export async function getScholarDashboardData(scholarId: string) {
     const supabase = await createSupabaseServerClient();
 
@@ -41,14 +53,16 @@ export async function getAdminDashboardData() {
         donorsCount,
         applicationsRes,
         cohortsRes,
-        programsRes
+        programsRes,
+        fundingRes
     ] = await Promise.all([
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "scholar"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "applicant"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "donor"),
-        supabase.from("applications").select("*, profiles(first_name, last_name)").order("created_at", { ascending: false }).limit(10),
-        supabase.from("cohorts").select("*").order("year", { ascending: false }),
-        supabase.from("programs").select("*")
+        supabase.from("applications").select("*, profiles(first_name, last_name, email)").order("created_at", { ascending: false }).limit(10),
+        supabase.from("cohorts").select("*, programs(name)").order("year", { ascending: false }),
+        supabase.from("programs").select("*"),
+        supabase.from("donor_details").select("commitment")
     ]);
 
     const counts = {
@@ -57,8 +71,11 @@ export async function getAdminDashboardData() {
         donors: donorsCount.count || 0,
     };
 
+    const totalFunding = fundingRes.data?.reduce((sum, d) => sum + (Number(d.commitment) || 0), 0) || 0;
+
     return {
         counts,
+        totalFunding,
         applications: applicationsRes.data || [],
         cohorts: cohortsRes.data || [],
         programs: programsRes.data || [],
@@ -70,18 +87,20 @@ export async function getDonorDashboardData(donorId: string) {
 
     const [
         profileRes,
+        detailsRes,
         fundingRes,
         scholarsRes,
         impactRes
     ] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", donorId).single(),
-        supabase.from("funding_records").select("*").eq("sponsor_id", donorId),
+        supabase.from("donor_details").select("*").eq("id", donorId).single(),
+        supabase.from("funding_records").select("*, programs(name)").eq("sponsor_id", donorId),
         supabase.from("profiles").select("*").eq("role", "scholar").limit(5), // Improved for demo
         supabase.from("impact_metrics").select("*").limit(10) // Showing global impact for donors
     ]);
 
     return {
-        profile: profileRes.data,
+        profile: { ...profileRes.data, ...detailsRes.data },
         fundingRecords: fundingRes.data || [],
         sponsoredScholars: scholarsRes.data || [],
         impactMetrics: impactRes.data || [],
@@ -235,7 +254,7 @@ export async function getAdminApplicationById(id: string) {
         .from("applications")
         .select(`
       *,
-      profiles (first_name, last_name, email, state)
+      profiles (first_name, last_name, email, state_of_origin)
     `)
         .eq("id", id)
         .single();
@@ -245,4 +264,249 @@ export async function getAdminApplicationById(id: string) {
         return null;
     }
     return data;
+}
+
+export async function getApplicantDashboardData(userId: string) {
+    const supabase = await createSupabaseServerClient();
+
+    const [
+        profileRes,
+        applicationRes,
+        announcementsRes,
+        notificationsRes,
+        deadlinesRes,
+    ] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+        supabase.from("applications").select("*, programs(name)").eq("applicant_id", userId).maybeSingle(),
+        supabase.from("announcements").select("*").or("audience.eq.all,audience.eq.applicants").order("created_at", { ascending: false }).limit(5),
+        supabase.from("notifications").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(5),
+        supabase.from("deadlines").select("*").or(`user_id.is.null,user_id.eq.${userId}`).order("due_date", { ascending: true }).limit(5),
+        // documents table is scholar-scoped (scholar_id); skip query for applicants
+    ]);
+
+    const application = applicationRes.data
+        ? {
+            ...applicationRes.data,
+            step: applicationRes.data.current_step,
+        }
+        : null;
+
+    const deadlines = (deadlinesRes.data || []).map((deadline) => ({
+        ...deadline,
+        days_left: getDaysUntilDueDate(deadline.due_date),
+    }));
+
+    return {
+        profile: profileRes.data,
+        application,
+        announcements: announcementsRes.data || [],
+        notifications: notificationsRes.data || [],
+        deadlines,
+        documents: [],
+    };
+}
+
+export async function getNotifications(userId: string) {
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+    return data || [];
+}
+
+export async function getDeadlines(userId: string) {
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase
+        .from("deadlines")
+        .select("*")
+        .or(`user_id.is.null,user_id.eq.${userId}`)
+        .order("due_date", { ascending: true });
+    return data || [];
+}
+export async function getPublicHomeData() {
+    const supabase = await createSupabaseServerClient();
+
+    const [
+        impactRes,
+        newsRes,
+        partnersRes
+    ] = await Promise.all([
+        supabase.from("impact_metrics").select("*").is("scholar_id", null).limit(4),
+        supabase.from("announcements").select("*").eq("audience", "all").order("created_at", { ascending: false }).limit(3),
+        supabase.from("partners").select("*").limit(8)
+    ]);
+
+    return {
+        impactMetrics: impactRes.data || [],
+        news: newsRes.data || [],
+        partners: partnersRes.data || []
+    };
+}
+
+export async function getPublicPrograms() {
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase.from("programs").select("*").order("name", { ascending: true });
+    return data || [];
+}
+
+export async function getPublicScholars() {
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase.from("profiles").select("*").eq("role", "scholar").limit(20);
+    return data || [];
+}
+
+export async function getPublicImpactDetails() {
+    const supabase = await createSupabaseServerClient();
+
+    const [impactMetricsRes, scholarsRes] = await Promise.all([
+        supabase.from("impact_metrics").select("*").is("scholar_id", null),
+        supabase.from("profiles").select("*").eq("role", "scholar").limit(4)
+    ]);
+
+    return {
+        impactMetrics: impactMetricsRes.data || [],
+        scholars: scholarsRes.data || []
+    };
+}
+
+export async function changePassword(newPassword: string): Promise<{ error: string | null }> {
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return { error: error.message };
+    return { error: null };
+}
+
+export async function withdrawApplication(userId: string): Promise<{ error: string | null }> {
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase
+        .from("applications")
+        .update({ status: "withdrawn" })
+        .eq("applicant_id", userId);
+    if (error) return { error: error.message };
+    return { error: null };
+}
+
+export async function updateProfile(
+    userId: string,
+    data: { first_name: string; last_name: string; phone: string; state_of_origin: string }
+): Promise<{ error: string | null }> {
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase
+        .from("profiles")
+        .update({
+            first_name: data.first_name,
+            last_name: data.last_name,
+            phone: data.phone,
+            state_of_origin: data.state_of_origin,
+        })
+        .eq("id", userId);
+    if (error) return { error: error.message };
+    return { error: null };
+}
+
+export async function submitApplication(): Promise<{ error: string | null }> {
+    const supabase = await createSupabaseServerClient();
+    const {
+        data: { user },
+        error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+        return { error: userError?.message || "You must be signed in to submit your application." };
+    }
+
+    const { data: application, error: fetchError } = await supabase
+        .from("applications")
+        .select("id, status, current_step")
+        .eq("applicant_id", user.id)
+        .maybeSingle();
+
+    if (fetchError) {
+        return { error: fetchError.message };
+    }
+
+    if (!application) {
+        return { error: "No application found to submit." };
+    }
+
+    if (application.status === "submitted") {
+        return { error: null };
+    }
+
+    const timestamp = new Date().toISOString();
+    const { error } = await supabase
+        .from("applications")
+        .update({
+            status: "submitted",
+            current_step: Math.max(application.current_step ?? 1, 5),
+            submitted_at: timestamp,
+            last_saved_at: timestamp,
+        })
+        .eq("id", application.id);
+
+    if (error) {
+        return { error: error.message };
+    }
+
+    return { error: null };
+}
+
+type ApplicationStepColumn = "personal_info" | "academic_background" | "essays";
+
+export async function saveApplicationStep(
+    step: number,
+    stepData: Record<string, unknown>,
+    isNext = false
+): Promise<{ error: string | null }> {
+    const stepColumnMap: Record<number, ApplicationStepColumn> = {
+        1: "personal_info",
+        2: "academic_background",
+        3: "essays",
+    };
+
+    const stepColumn = stepColumnMap[step];
+    if (!stepColumn) {
+        return { error: "Invalid application step." };
+    }
+
+    const supabase = await createSupabaseServerClient();
+    const {
+        data: { user },
+        error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+        return { error: userError?.message || "You must be signed in to save this step." };
+    }
+
+    const { data: existingApplication, error: fetchError } = await supabase
+        .from("applications")
+        .select("id, current_step")
+        .eq("applicant_id", user.id)
+        .maybeSingle();
+
+    if (fetchError) {
+        return { error: fetchError.message };
+    }
+
+    const targetStep = isNext ? step + 1 : step;
+    const nextCurrentStep = Math.max(existingApplication?.current_step ?? 1, targetStep);
+    const payload: Record<string, unknown> = {
+        applicant_id: user.id,
+        current_step: nextCurrentStep,
+        last_saved_at: new Date().toISOString(),
+        [stepColumn]: stepData,
+    };
+
+    const writeResult = existingApplication
+        ? await supabase.from("applications").update(payload).eq("id", existingApplication.id)
+        : await supabase.from("applications").insert(payload);
+
+    if (writeResult.error) {
+        return { error: writeResult.error.message };
+    }
+
+    return { error: null };
 }

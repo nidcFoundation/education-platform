@@ -8,7 +8,7 @@ import { ArrowRight, Briefcase, Compass, Target } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getScholarDashboardData } from "@/lib/supabase/actions";
 import { redirect } from "next/navigation";
-import { opportunities } from "@/mock-data/scholar";
+import { scholarOpportunities as opportunities } from "@/lib/constants";
 
 export default async function OpportunitiesPage() {
   const supabase = await createSupabaseServerClient();
@@ -92,10 +92,10 @@ export default async function OpportunitiesPage() {
                   <div className="mt-1 flex flex-col items-center">
                     <div
                       className={`h-3 w-3 rounded-full ${stage.status === "completed"
-                          ? "bg-primary"
-                          : stage.status === "active"
-                            ? "bg-amber-500"
-                            : "bg-muted-foreground/30"
+                        ? "bg-primary"
+                        : stage.status === "active"
+                          ? "bg-amber-500"
+                          : "bg-muted-foreground/30"
                         }`}
                     />
                     {index < placementStages.length - 1 && (
@@ -177,9 +177,7 @@ export default async function OpportunitiesPage() {
                         value={
                           opportunity.status === "active"
                             ? 78
-                            : opportunity.status === "completed"
-                              ? 100
-                              : 56
+                            : 56
                         }
                         className="mt-3 h-2"
                       />

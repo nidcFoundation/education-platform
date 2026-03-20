@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { Mail, Send } from "lucide-react";
-import { donorMessages } from "@/mock-data/donor";
+import { donorMessages } from "@/lib/constants";
 
 export default function DonorMessagesPage() {
     const [selectedThreadId, setSelectedThreadId] = useState<string | null>(donorMessages[0]?.id ?? null);

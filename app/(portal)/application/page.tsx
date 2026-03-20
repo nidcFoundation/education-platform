@@ -1,35 +1,54 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { PageContainer } from "@/components/layout/page-container";
 import { ApplicationStepper } from "@/components/forms/application-stepper";
 import { ApplicationStatusBadge } from "@/components/ui/application-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Clock, CheckCircle2, FileText, GraduationCap, ScrollText, Upload } from "lucide-react";
-import { mockApplication, applicationSteps, programChoices } from "@/mock-data/applicant";
+import { applicationSteps } from "@/lib/constants/application";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { getApplicantDashboardData } from "@/lib/supabase/actions";
 
 const stepIcons = [FileText, GraduationCap, ScrollText, Upload, CheckCircle2];
 
-export default function StartApplicationPage() {
+export default async function StartApplicationPage() {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        redirect("/login");
+    }
+
+    const { application } = await getApplicantDashboardData(user.id);
+
+    // Default values if no application exists yet
+    const currentStep = application?.step || application?.current_step || 1;
+    const status = application?.status || "draft";
+    const programName = application?.program_id || "Not Started";
+    const appId = application?.id ? `NTDI-${application.id.slice(0, 8)}` : "New Application";
+
     return (
         <PageContainer
             title="My Application"
-            description={`Application ID: ${mockApplication.id}`}
+            description={`Application ID: ${appId}`}
         >
             <div className="max-w-4xl mx-auto space-y-8">
-                {/* Application summary header */}
                 <Card className="border-border/50">
                     <CardContent className="p-6">
                         <div className="flex flex-col md:flex-row gap-6 md:items-center md:justify-between">
                             <div className="space-y-2">
                                 <div className="flex items-center gap-3">
-                                    <h2 className="text-xl font-bold">{mockApplication.programChoice}</h2>
-                                    <ApplicationStatusBadge status={mockApplication.status} />
+                                    <h2 className="text-xl font-bold">{programName}</h2>
+                                    <ApplicationStatusBadge status={status} />
                                 </div>
-                                <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                                    <Clock className="h-3.5 w-3.5" />
-                                    Last saved: March 15, 2026 at 2:30 PM
-                                </p>
+                                {application?.updated_at && (
+                                    <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                                        <Clock className="h-3.5 w-3.5" />
+                                        Last saved: {new Date(application.updated_at).toLocaleString()}
+                                    </p>
+                                )}
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 <Badge variant="outline">2025 Cohort</Badge>
@@ -39,27 +58,24 @@ export default function StartApplicationPage() {
                     </CardContent>
                 </Card>
 
-                {/* Stepper */}
-                <ApplicationStepper steps={applicationSteps} currentStep={mockApplication.currentStep} />
+                <ApplicationStepper steps={[...applicationSteps]} currentStep={currentStep} />
 
-                {/* Step Cards */}
                 <div className="space-y-4">
                     {applicationSteps.map((step) => {
                         const Icon = stepIcons[step.step - 1];
-                        const isCompleted = step.step < mockApplication.currentStep;
-                        const isActive = step.step === mockApplication.currentStep;
-                        const isPending = step.step > mockApplication.currentStep;
+                        const isCompleted = step.step < currentStep;
+                        const isActive = step.step === currentStep;
 
                         return (
                             <Card key={step.step} className={`border transition-colors ${isActive ? "border-primary/40 shadow-sm" :
-                                    isCompleted ? "border-emerald-200 bg-emerald-50/30 dark:bg-emerald-900/10" :
-                                        "border-border/50 opacity-70"
+                                isCompleted ? "border-emerald-200 bg-emerald-50/30 dark:bg-emerald-900/10" :
+                                    "border-border/50 opacity-70"
                                 }`}>
                                 <CardContent className="p-5">
                                     <div className="flex items-center gap-4">
                                         <div className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 ${isCompleted ? "bg-emerald-100 text-emerald-600" :
-                                                isActive ? "bg-primary/10 text-primary" :
-                                                    "bg-muted text-muted-foreground/40"
+                                            isActive ? "bg-primary/10 text-primary" :
+                                                "bg-muted text-muted-foreground/40"
                                             }`}>
                                             {isCompleted ? <CheckCircle2 className="h-6 w-6" /> : <Icon className="h-6 w-6" />}
                                         </div>
