@@ -41,6 +41,20 @@ function getApplicationPermissionErrorMessage(rawMessage?: string, action: "save
     return rawMessage || "An unexpected error occurred.";
 }
 
+function getProfileSaveErrorMessage(rawMessage?: string) {
+    const message = (rawMessage || "").toLowerCase();
+    const isPermissionError =
+        message.includes("permission denied") ||
+        message.includes("row-level security") ||
+        message.includes("violates row-level security policy");
+
+    if (isPermissionError) {
+        return "Unable to save profile details right now due to access restrictions.";
+    }
+
+    return "Unable to save profile details right now. Please try again.";
+}
+
 export async function getScholarDashboardData(scholarId: string) {
     const supabase = await createSupabaseServerClient();
 
@@ -303,17 +317,42 @@ export async function getApplicantDashboardData(userId: string) {
         deadlinesRes,
     ] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
-        supabase.from("applications").select("*, programs(name)").eq("applicant_id", userId).maybeSingle(),
+        supabase
+            .from("applications")
+            .select("*, programs(name)")
+            .eq("applicant_id", userId)
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
         supabase.from("announcements").select("*").or("audience.eq.all,audience.eq.applicants").order("created_at", { ascending: false }).limit(5),
         supabase.from("notifications").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(5),
         supabase.from("deadlines").select("*").or(`user_id.is.null,user_id.eq.${userId}`).order("due_date", { ascending: true }).limit(5),
         // documents table is scholar-scoped (scholar_id); skip query for applicants
     ]);
 
-    const application = applicationRes.data
+    let applicationData = applicationRes.data;
+
+    if (applicationRes.error) {
+        // Fallback when relational select fails (for example, missing relationship metadata in some environments).
+        const fallbackApplicationRes = await supabase
+            .from("applications")
+            .select("*")
+            .eq("applicant_id", userId)
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (fallbackApplicationRes.error) {
+            console.error("Error fetching applicant application:", fallbackApplicationRes.error);
+        } else {
+            applicationData = fallbackApplicationRes.data;
+        }
+    }
+
+    const application = applicationData
         ? {
-            ...applicationRes.data,
-            step: applicationRes.data.current_step,
+            ...applicationData,
+            step: applicationData.current_step,
         }
         : null;
 
@@ -447,6 +486,8 @@ export async function submitApplication(): Promise<{ error: string | null }> {
         .from("applications")
         .select("id, status, current_step")
         .eq("applicant_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
     if (fetchError) {
@@ -507,10 +548,40 @@ export async function saveApplicationStep(
         return { error: userError?.message || "You must be signed in to save this step." };
     }
 
+    if (step === 1) {
+        const profileUpdatePayload: Record<string, string> = {};
+
+        const addIfPresentString = (inputKey: string, profileKey: string) => {
+            if (!Object.prototype.hasOwnProperty.call(stepData, inputKey)) return;
+            const rawValue = stepData[inputKey];
+            if (typeof rawValue !== "string") return;
+            profileUpdatePayload[profileKey] = rawValue.trim();
+        };
+
+        addIfPresentString("firstName", "first_name");
+        addIfPresentString("lastName", "last_name");
+        addIfPresentString("phone", "phone");
+        addIfPresentString("stateOfOrigin", "state_of_origin");
+
+        if (Object.keys(profileUpdatePayload).length > 0) {
+            const { error: profileUpdateError } = await supabase
+                .from("profiles")
+                .update(profileUpdatePayload)
+                .eq("id", user.id);
+
+            if (profileUpdateError) {
+                console.error("Error updating applicant profile during step save:", profileUpdateError);
+                return { error: getProfileSaveErrorMessage(profileUpdateError.message) };
+            }
+        }
+    }
+
     const { data: existingApplication, error: fetchError } = await supabase
         .from("applications")
         .select("id, current_step")
         .eq("applicant_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
     if (fetchError) {
