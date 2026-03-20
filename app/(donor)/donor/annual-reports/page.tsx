@@ -58,7 +58,6 @@ export default function AnnualReportsPage() {
                   <Button className="flex-1" disabled>
                     Download
                   </Button>
-                  +{" "}
                   <Button variant="outline" className="flex-1" disabled>
                     View Summary
                   </Button>

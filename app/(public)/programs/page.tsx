@@ -45,7 +45,9 @@ export default async function ProgramsPage() {
             <SectionWrapper title="Strategic Disciplines" className="bg-background">
                 <div className="grid md:grid-cols-2 gap-8 mt-8">
                     {programs.map((program) => {
-                        const Icon = iconMap[program.id] ?? Monitor;
+                        const focusAreaId = program.focusAreaId ?? program.focus_area_id ?? "";
+                        const categoryKey = (typeof focusAreaId === "string" ? focusAreaId.split("-")[1] : "") || "tech";
+                        const Icon = iconMap[categoryKey] ?? Monitor;
                         return (
                             <Card key={program.id} className="border-border/50 bg-card hover:shadow-lg transition-shadow overflow-hidden">
                                 <CardHeader className="pb-4">

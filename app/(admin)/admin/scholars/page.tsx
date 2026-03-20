@@ -34,6 +34,24 @@ export default async function ScholarManagementPage() {
     redirect("/login");
   }
 
+  const metadataRole = typeof user.user_metadata?.role === "string"
+    ? user.user_metadata.role
+    : null;
+
+  let role = metadataRole;
+  if (!role) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    role = profile?.role ?? null;
+  }
+
+  if (role !== "admin") {
+    redirect("/login");
+  }
+
   const scholars = await getAdminScholars();
 
   const scholarMetrics = [

@@ -94,7 +94,7 @@ export default async function DonorDashboardPage() {
                             <div className="space-y-5">
                                 <div>
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <h2 className="text-2xl font-semibold tracking-tight">{profile?.category || "Donor Organization"}</h2>
+                                        <h2 className="text-2xl font-semibold tracking-tight">{profile?.name || profile?.organisation || "Donor Organization"}</h2>
                                         <Badge variant="secondary">Active Donor</Badge>
                                         <Badge variant="outline">{profile?.id?.slice(0, 8) || "DNR-Pending"}</Badge>
                                     </div>
@@ -223,37 +223,43 @@ export default async function DonorDashboardPage() {
                         </Button>
                     </CardHeader>
                     <CardContent className="grid gap-4 lg:grid-cols-2">
-                        {sponsoredScholars.map((scholar: any) => (
-                            <div key={scholar.id} className="rounded-xl border bg-background p-4">
-                                <div className="flex items-start gap-3">
-                                    <Avatar className="h-12 w-12">
-                                        <AvatarFallback className="bg-primary/10 font-semibold text-primary">
-                                            {scholar.first_name[0]}{scholar.last_name[0]}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <p className="font-semibold">{scholar.first_name} {scholar.last_name}</p>
-                                            <Badge variant="outline">Cohort {scholar.cohort || "2026"}</Badge>
+                        {sponsoredScholars.map((scholar: any) => {
+                            const firstName = scholar.first_name?.trim() || "";
+                            const lastName = scholar.last_name?.trim() || "";
+                            const scholarInitials = `${firstName.charAt(0)}${lastName.charAt(0)}`.trim() || "?";
+
+                            return (
+                                <div key={scholar.id} className="rounded-xl border bg-background p-4">
+                                    <div className="flex items-start gap-3">
+                                        <Avatar className="h-12 w-12">
+                                            <AvatarFallback className="bg-primary/10 font-semibold text-primary">
+                                                {scholarInitials}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="font-semibold">{scholar.first_name} {scholar.last_name}</p>
+                                                <Badge variant="outline">Cohort {scholar.cohort || "2026"}</Badge>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">{scholar.program || "Technology Track"} · {scholar.institution || "NTDI Academy"}</p>
                                         </div>
-                                        <p className="text-sm text-muted-foreground">{scholar.program || "Technology Track"} · {scholar.institution || "NTDI Academy"}</p>
+                                        <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                                            {scholar.progress_score >= 80 ? "Excellent" : scholar.progress_score >= 60 ? "On Track" : "Needs Review"}
+                                        </Badge>
                                     </div>
-                                    <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
-                                        {scholar.progress_score >= 80 ? "Excellent" : scholar.progress_score >= 60 ? "On Track" : "Needs Review"}
-                                    </Badge>
-                                </div>
 
-                                <div className="mt-4 space-y-2">
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-muted-foreground">Development score</span>
-                                        <span className="font-semibold">{scholar.progress_score || 0}%</span>
+                                    <div className="mt-4 space-y-2">
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="text-muted-foreground">Development score</span>
+                                            <span className="font-semibold">{scholar.progress_score || 0}%</span>
+                                        </div>
+                                        <Progress value={scholar.progress_score || 0} className="h-2" />
                                     </div>
-                                    <Progress value={scholar.progress_score || 0} className="h-2" />
-                                </div>
 
-                                <p className="mt-4 text-sm text-muted-foreground">{scholar.bio?.slice(0, 100) || "Progressing well across all academic tracks and career readiness modules."}...</p>
-                            </div>
-                        ))}
+                                    <p className="mt-4 text-sm text-muted-foreground">{scholar.bio?.slice(0, 100) || "Progressing well across all academic tracks and career readiness modules."}...</p>
+                                </div>
+                            );
+                        })}
                         {sponsoredScholars.length === 0 && (
                             <p className="text-sm text-muted-foreground p-8 text-center border rounded-xl bg-muted/5">No sponsored scholars yet. Your scholarship allocations will appear here once finalized.</p>
                         )}

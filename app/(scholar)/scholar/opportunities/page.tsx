@@ -175,11 +175,9 @@ export default async function OpportunitiesPage() {
                       </p>
                       <Progress
                         value={
-                          (opportunity.status as any) === "active"
+                          opportunity.status === "active"
                             ? 78
-                            : (opportunity.status as any) === "completed"
-                              ? 100
-                              : 56
+                            : 56
                         }
                         className="mt-3 h-2"
                       />

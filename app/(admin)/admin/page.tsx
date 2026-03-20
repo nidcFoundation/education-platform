@@ -213,27 +213,38 @@ export default async function AdminDashboardPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {applications.slice(0, 4).map((application: any) => (
-                                        <TableRow key={application.id}>
-                                            <TableCell>
-                                                <div>
-                                                    <p className="font-medium text-sm">
-                                                        {application.profiles?.first_name} {application.profiles?.last_name || application.profiles?.email?.split('@')[0]}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">{application.id.slice(0, 8)}</p>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-xs max-w-[150px] truncate">
-                                                {application.programs?.name || "Unassigned"}
-                                            </TableCell>
-                                            <TableCell>
-                                                <ApplicationStatusBadge status={application.status} />
-                                            </TableCell>
-                                            <TableCell className="text-xs text-muted-foreground italic">
-                                                {new Date(application.created_at).toLocaleDateString()}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                    {applications.slice(0, 4).map((application: any) => {
+                                        const firstName = typeof application.profiles?.first_name === "string"
+                                            ? application.profiles.first_name.trim()
+                                            : "";
+                                        const lastName = typeof application.profiles?.last_name === "string"
+                                            ? application.profiles.last_name.trim()
+                                            : "";
+                                        const emailLocalPart = typeof application.profiles?.email === "string"
+                                            ? application.profiles.email.split("@")[0]
+                                            : "";
+                                        const displayName = [firstName, lastName].filter(Boolean).join(" ") || emailLocalPart || "Applicant";
+
+                                        return (
+                                            <TableRow key={application.id}>
+                                                <TableCell>
+                                                    <div>
+                                                        <p className="font-medium text-sm">{displayName}</p>
+                                                        <p className="text-xs text-muted-foreground">{application.id.slice(0, 8)}</p>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-xs max-w-[150px] truncate">
+                                                    {application.programs?.name || "Unassigned"}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <ApplicationStatusBadge status={application.status} />
+                                                </TableCell>
+                                                <TableCell className="text-xs text-muted-foreground italic">
+                                                    {new Date(application.created_at).toLocaleDateString()}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
                                     {applications.length === 0 && (
                                         <TableRow>
                                             <TableCell colSpan={4} className="text-center text-muted-foreground py-8">No applications in queue.</TableCell>

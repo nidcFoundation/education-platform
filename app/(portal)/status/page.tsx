@@ -39,7 +39,11 @@ export default async function ApplicationStatusPage() {
     const resolvedProfile = profile ?? buildProfileFallback(user);
 
     const currentStatus = application?.status || "draft";
-    const statusIndex = statusTimeline.findIndex(s => s.status === currentStatus);
+    const statusIndex = Math.max(
+      0,
+      statusTimeline.findIndex((s) => s.status === currentStatus)
+    );
+    
 
     return (
         <PageContainer
@@ -149,7 +153,7 @@ export default async function ApplicationStatusPage() {
                             <Separator />
                             <div>
                                 <p className="text-xs text-muted-foreground">Programme</p>
-                                <p className="text-xs font-medium">{application?.program_id || "Not selected"}</p>
+                                <p className="text-xs font-medium">{application?.programs?.name || "Not selected"}</p>
                             </div>
                             {application && (
                                 <div>

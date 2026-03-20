@@ -7,8 +7,32 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getAdminScholars } from "@/lib/supabase/actions";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 export default async function ScholarProfilesPage() {
+    const supabase = await createSupabaseServerClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    const sessionUser = session?.user;
+
+    if (!sessionUser) {
+        redirect("/login");
+    }
+
+    const hasAdminFlag = [sessionUser.user_metadata?.is_admin, sessionUser.app_metadata?.is_admin].some(
+        (value) => value === true || (typeof value === "string" && value.toLowerCase() === "true")
+    );
+    const hasAdminRole = [
+        sessionUser.user_metadata?.role,
+        sessionUser.app_metadata?.role,
+        sessionUser.user_metadata?.account_type,
+        sessionUser.app_metadata?.account_type,
+    ].some((value) => typeof value === "string" && value.toLowerCase() === "admin");
+
+    if (!hasAdminFlag && !hasAdminRole) {
+        redirect("/dashboard");
+    }
+
     const scholars = await getAdminScholars();
     const featuredScholar = scholars[0];
 

@@ -46,18 +46,23 @@ export default async function SponsoredScholarsPage() {
                                 <div className="flex items-start gap-4">
                                     <Avatar className="h-14 w-14">
                                         <AvatarFallback className="bg-primary/10 font-semibold text-primary">
-                                            {scholar.first_name?.[0]}{scholar.last_name?.[0]}
+                                            {scholar.first_name?.[0] ?? ''}{scholar.last_name?.[0] ?? ''}
+                                            {!scholar.first_name && !scholar.last_name ? '?' : ''}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div className="flex-1 space-y-3">
                                         <div className="flex flex-wrap items-start justify-between gap-3">
                                             <div>
                                                 <div className="flex flex-wrap items-center gap-2">
-                                                    <h2 className="font-semibold">{scholar.first_name} {scholar.last_name}</h2>
-                                                    <Badge variant="outline">Cohort {scholar.cohort || "2026"}</Badge>
+                                                    <h2 className="font-semibold">
+                                                        {scholar.first_name || scholar.last_name
+                                                            ? `${scholar.first_name ?? ''} ${scholar.last_name ?? ''}`.trim()
+                                                            : "Name unavailable"}
+                                                    </h2>
+                                                    <Badge variant="outline">Cohort {scholar.cohort || "Unknown"}</Badge>
                                                 </div>
-                                                <p className="mt-1 text-sm text-muted-foreground">{scholar.program || "Technology track"}</p>
-                                                <p className="text-sm text-muted-foreground">{scholar.institution || "NTDI Academy"}</p>
+                                                <p className="mt-1 text-sm text-muted-foreground">{scholar.program || "Not provided"}</p>
+                                                <p className="text-sm text-muted-foreground">{scholar.institution || "Not provided"}</p>
                                             </div>
                                             <Badge className={(scholar.progress_score || 0) >= 80 ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" : "bg-blue-100 text-blue-800 hover:bg-blue-100"}>
                                                 {(scholar.progress_score || 0) >= 80 ? "Excellent" : "On Track"}
@@ -90,7 +95,7 @@ export default async function SponsoredScholarsPage() {
                                                 Impact Narrative
                                             </p>
                                             <p className="mt-2 text-sm text-muted-foreground">
-                                                {scholar.bio || "Funding contributes directly to this scholar's tuition, monthly stipends, and specialized career mentorship programs."}
+                                                {scholar.bio || "No impact narrative available."}
                                             </p>
                                         </div>
                                     </div>
