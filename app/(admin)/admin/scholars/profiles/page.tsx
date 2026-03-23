@@ -211,8 +211,8 @@ export default async function ScholarProfilesPage() {
                             </CardHeader>
                             <CardContent className="space-y-3">
                                 {[
-                                    { label: "Technical Screening", status: "completed", detail: "Internal readiness score: 92%" },
-                                    { label: "Partner Interviews", status: "active", detail: "Matching with Infrastructure Development agencies" },
+                                    { label: "Technical Screening", status: "completed" as const, detail: "Internal readiness score: 92%" },
+                                    { label: "Partner Interviews", status: "active" as const, detail: "Matching with Infrastructure Development agencies" },
                                 ].map((stage) => (
                                     <div key={stage.label} className="rounded-xl border bg-background p-4">
                                         <div className="flex items-center justify-between gap-3">

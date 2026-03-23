@@ -1,9 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   FileText,
@@ -49,6 +49,71 @@ export function SidebarContent({ role = "applicant" }: SidebarProps) {
     router.replace("/login");
     router.refresh();
   };
+
+  const roleMeta = {
+    applicant: {
+      homeHref: "/dashboard",
+      productLabel: "Applicant Portal",
+      userName: "John Doe",
+    },
+    scholar: {
+      homeHref: "/scholar",
+      productLabel: "Scholar Portal",
+      userName: "Amara Okafor",
+    },
+    donor: {
+      homeHref: "/donor",
+      productLabel: "Donor Dashboard",
+      userName: "Crescent Impact Fund",
+    },
+    admin: {
+      homeHref: "/admin",
+      productLabel: "Admin Console",
+      userName: "Programme Admin",
+    },
+  } as const;
+
+  const meta = roleMeta[role];
+
+  const [userProfile, setUserProfile] = useState<{ name: string; avatarUrl?: string | null }>({
+    name: meta.userName,
+    avatarUrl: null,
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchProfile() {
+      const supabase = getSupabaseBrowserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, avatar_url')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error("Sidebar fetchProfile error:", error);
+      }
+
+      if (profile && isMounted) {
+        setUserProfile({
+          name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || meta.userName,
+          avatarUrl: profile.avatar_url,
+        });
+      }
+    }
+    fetchProfile();
+
+    const handleProfileUpdate = () => fetchProfile();
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('profileUpdated', handleProfileUpdate);
+    };
+  }, [meta.userName]);
 
   const roleLinks = {
     applicant: [
@@ -140,31 +205,7 @@ export function SidebarContent({ role = "applicant" }: SidebarProps) {
     ],
   } as const;
 
-  const roleMeta = {
-    applicant: {
-      homeHref: "/dashboard",
-      productLabel: "Applicant Portal",
-      userName: "John Doe",
-    },
-    scholar: {
-      homeHref: "/scholar",
-      productLabel: "Scholar Portal",
-      userName: "Amara Okafor",
-    },
-    donor: {
-      homeHref: "/donor",
-      productLabel: "Donor Dashboard",
-      userName: "Crescent Impact Fund",
-    },
-    admin: {
-      homeHref: "/admin",
-      productLabel: "Admin Console",
-      userName: "Programme Admin",
-    },
-  } as const;
-
   const links = roleLinks[role];
-  const meta = roleMeta[role];
 
   return (
     <div className="flex flex-col h-full">
@@ -209,12 +250,20 @@ export function SidebarContent({ role = "applicant" }: SidebarProps) {
       </nav>
       <div className="p-4 border-t mt-auto space-y-2">
         <div className="flex items-center gap-3 px-3 py-2">
-          <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </div>
+          {userProfile.avatarUrl ? (
+            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
+              <img src={userProfile.avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+            </div>
+          ) : (
+            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+              <span className="text-xs font-bold text-muted-foreground uppercase">
+                {userProfile.name ? userProfile.name.split(' ').map(n => n[0]).join('').substring(0, 2) : <Users className="h-4 w-4 text-muted-foreground" />}
+              </span>
+            </div>
+          )}
           <div className="flex flex-col">
             <span className="text-sm font-medium leading-none">
-              {meta.userName}
+              {userProfile.name}
             </span>
             <span className="text-xs text-muted-foreground mt-1 capitalize">
               {role}

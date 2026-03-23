@@ -12,6 +12,7 @@ import { Save, User, Mail, Phone, MapPin, Shield, Bell, Lock, AlertTriangle } fr
 import { nigerianStates } from "@/lib/constants/nigeria";
 import { toast } from "sonner";
 import { changePassword, withdrawApplication, updateProfile } from "@/lib/supabase/actions";
+import { CldUploadWidget } from "next-cloudinary";
 
 interface ProfileFormProps {
     profile: any;
@@ -32,6 +33,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
     const [lastName, setLastName] = useState(profile?.last_name ?? "");
     const [phone, setPhone] = useState(profile?.phone ?? "");
     const [stateOfOrigin, setStateOfOrigin] = useState(profile?.state_of_origin ?? "");
+    const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url ?? "");
 
     // ── Notification Preferences ──────────────────────────────────────────────
     const [prefs, setPrefs] = useState<Record<string, boolean>>(
@@ -106,11 +108,13 @@ export function ProfileForm({ profile }: ProfileFormProps) {
                 last_name: lastName,
                 phone,
                 state_of_origin: stateOfOrigin,
+                avatar_url: avatarUrl,
             });
             if (error) {
                 toast.error(error);
             } else {
                 toast.success("Profile updated successfully");
+                window.dispatchEvent(new Event('profileUpdated'));
             }
         } catch (err) {
             toast.error("An unexpected error occurred. Please try again.");
@@ -125,8 +129,38 @@ export function ProfileForm({ profile }: ProfileFormProps) {
             <Card className="border-border/50">
                 <CardHeader className="border-b bg-muted/10 pb-4">
                     <div className="flex items-center gap-4">
-                        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary">
-                            {profile.first_name?.[0] ?? ''}{profile.last_name?.[0] ?? ''}
+                        <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary relative group overflow-hidden shrink-0">
+                            {avatarUrl ? (
+                                <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                                <span>{profile.first_name?.[0] ?? ''}{profile.last_name?.[0] ?? ''}</span>
+                            )}
+                            <CldUploadWidget
+                                signatureEndpoint="/api/cloudinary/sign"
+                                onSuccess={(result) => {
+                                    if (result.info && typeof result.info !== "string" && result.info.secure_url) {
+                                        setAvatarUrl(result.info.secure_url);
+                                        updateProfile(profile.id, { avatar_url: result.info.secure_url })
+                                    .then(({ error }) => {
+                                        if (error) {
+                                            toast.error("Failed to save avatar. Please try again.");
+                                        } else {
+                                            toast.success("Avatar updated successfully!");
+                                            window.dispatchEvent(new Event('profileUpdated'));
+                                        }
+                                    });
+                                    }
+                                }}
+                            >
+                                {({ open }) => (
+                                    <div
+                                        onClick={(e) => { e.preventDefault(); open(); }}
+                                        className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white text-xs font-medium"
+                                    >
+                                        Edit
+                                    </div>
+                                )}
+                            </CldUploadWidget>
                         </div>
                         <div>
                             <h2 className="text-lg font-bold">{profile.first_name ?? ''} {profile.last_name ?? ''}</h2>
