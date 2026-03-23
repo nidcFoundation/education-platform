@@ -340,3 +340,50 @@ export const donorMessages = [
         ]
     }
 ];
+
+export const scholarMessages = [
+    {
+        id: "msg-s1",
+        participant: "Programme Mentor",
+        role: "Academic Support",
+        unreadCount: 2,
+        lastMessage: "Please review the feedback on your latest progress report.",
+        timestamp: "1h ago",
+        messages: [
+            {
+                id: "sm1",
+                sender: "Programme Mentor",
+                time: "Yesterday, 09:15 AM",
+                body: "Hi! I noticed your capstone research methodology draft was submitted. Let's schedule a call to review the approach."
+            },
+            {
+                id: "sm2",
+                sender: "You",
+                time: "Yesterday, 11:30 AM",
+                body: "Thank you for letting me know. I am available tomorrow afternoon from 2 PM to 4 PM."
+            },
+            {
+                id: "sm3",
+                sender: "Programme Mentor",
+                time: "1h ago",
+                body: "Great! Let's do 3 PM. Also, please review the feedback on your latest progress report before our call."
+            }
+        ]
+    },
+    {
+        id: "msg-s2",
+        participant: "Finance Team",
+        role: "Stipends & Grants",
+        unreadCount: 0,
+        lastMessage: "Your monthly living stipend has been disbursed.",
+        timestamp: "Mar 20",
+        messages: [
+            {
+                id: "sm4",
+                sender: "Finance Team",
+                time: "Mar 20, 10:00 AM",
+                body: "Dear Scholar, your monthly living stipend for March has been disbursed. Please allow 24-48 hours for it to reflect in your account."
+            }
+        ]
+    }
+];
