@@ -33,4 +33,4 @@ where not exists (
     select 1
     from public.profiles p
     where p.id = au.id
-)
+);

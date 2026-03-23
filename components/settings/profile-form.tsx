@@ -140,10 +140,15 @@ export function ProfileForm({ profile }: ProfileFormProps) {
                                 onSuccess={(result) => {
                                     if (result.info && typeof result.info !== "string" && result.info.secure_url) {
                                         setAvatarUrl(result.info.secure_url);
-                                        toast.success("Avatar uploaded! Remember to save profile changes.");
-                                        // Auto-save the avatar into the DB (optional, but good UX)
                                         updateProfile(profile.id, { avatar_url: result.info.secure_url })
-                                            .then(() => window.dispatchEvent(new Event('profileUpdated')));
+                                    .then(({ error }) => {
+                                        if (error) {
+                                            toast.error("Failed to save avatar. Please try again.");
+                                        } else {
+                                            toast.success("Avatar updated successfully!");
+                                            window.dispatchEvent(new Event('profileUpdated'));
+                                        }
+                                    });
                                     }
                                 }}
                             >

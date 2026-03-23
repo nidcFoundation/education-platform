@@ -459,10 +459,10 @@ export async function updateProfile(
 ): Promise<{ error: string | null }> {
     const supabase = await createSupabaseServerClient();
     const updatePayload: Record<string, string> = {};
-    if (data.first_name) updatePayload.first_name = data.first_name;
-    if (data.last_name) updatePayload.last_name = data.last_name;
-    if (data.phone) updatePayload.phone = data.phone;
-    if (data.state_of_origin) updatePayload.state_of_origin = data.state_of_origin;
+    if (data.first_name !== undefined) updatePayload.first_name = data.first_name;
+    if (data.last_name !== undefined) updatePayload.last_name = data.last_name;
+    if (data.phone !== undefined) updatePayload.phone = data.phone;
+    if (data.state_of_origin !== undefined) updatePayload.state_of_origin = data.state_of_origin;
     if (data.avatar_url !== undefined) updatePayload.avatar_url = data.avatar_url;
 
     const { error } = await supabase
