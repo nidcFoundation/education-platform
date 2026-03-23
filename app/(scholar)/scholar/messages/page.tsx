@@ -89,9 +89,14 @@ export default function ScholarMessagesPage() {
                                 </div>
 
                                 <div className="rounded-xl border bg-background p-4 mt-auto">
-                                    <Textarea rows={4} placeholder="Write your reply here..." className="resize-none" />
+                                    <Textarea
+                                        rows={4}
+                                        placeholder="Send not implemented yet..."
+                                        className="resize-none"
+                                        readOnly
+                                    />
                                     <div className="mt-3 flex justify-end">
-                                        <Button>
+                                        <Button disabled aria-disabled title="Send not implemented">
                                             <Send className="mr-1 h-4 w-4" />
                                             Send Message
                                         </Button>

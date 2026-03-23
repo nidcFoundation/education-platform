@@ -9,7 +9,7 @@ export default async function ScholarAnnouncementsPage() {
 
     const { data: announcements, error } = await supabase
         .from("announcements")
-        .select("*")
+        .select("*, profiles(first_name, last_name)")
         .or("audience.eq.all,audience.eq.scholars")
         .order("created_at", { ascending: false });
 
@@ -52,7 +52,7 @@ export default async function ScholarAnnouncementsPage() {
                                                     day: "numeric",
                                                 })}
                                                 <span className="text-muted-foreground/50 mx-1">•</span>
-                                                <span>Posted by {announcement.author}</span>
+                                                <span>Posted by {announcement.profiles ? `${announcement.profiles.first_name || ""} ${announcement.profiles.last_name || ""}`.trim() : (announcement.author || announcement.author_id || "Programme Office")}</span>
                                             </CardDescription>
                                         </div>
                                         {isPinned && (
