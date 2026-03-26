@@ -109,6 +109,19 @@ const requiredDocuments: RequiredDocument[] = [
   },
 ];
 
+const requiredDocumentTypeCounts = requiredDocuments.reduce<Record<DocumentType, number>>((counts, document) => {
+    counts[document.type] = (counts[document.type] || 0) + 1;
+    return counts;
+}, {
+    transcript: 0,
+    id: 0,
+    reference_letter: 0,
+    essay: 0,
+    jamb_result: 0,
+    award_letter: 0,
+    other: 0,
+});
+
 const statusIcon: Record<DocumentStatus, React.ReactNode> = {
   verified: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
   pending: <Clock className="h-4 w-4 text-amber-500" />,
