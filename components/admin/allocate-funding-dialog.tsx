@@ -118,7 +118,7 @@ export function AllocateFundingDialog({ sponsors, scholars, programs }: Allocate
                         <div className="space-y-2">
                             <Label htmlFor="sponsor">Sponsor</Label>
                             <Select value={sponsorId} onValueChange={setSponsorId} required>
-                                <SelectTrigger>
+                                <SelectTrigger id="sponsor">
                                     <SelectValue placeholder="Select perfectly capable sponsor..." />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -134,7 +134,7 @@ export function AllocateFundingDialog({ sponsors, scholars, programs }: Allocate
                         <div className="space-y-2">
                             <Label htmlFor="scholar">Scholar</Label>
                             <Select value={scholarId} onValueChange={setScholarId} required>
-                                <SelectTrigger>
+                                <SelectTrigger id="scholar">
                                     <SelectValue placeholder="Select recipient scholar..." />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -150,7 +150,7 @@ export function AllocateFundingDialog({ sponsors, scholars, programs }: Allocate
                         <div className="space-y-2">
                             <Label htmlFor="program">Program (Optional)</Label>
                             <Select value={programId} onValueChange={setProgramId}>
-                                <SelectTrigger>
+                                <SelectTrigger id="program">
                                     <SelectValue placeholder="Select associated program..." />
                                 </SelectTrigger>
                                 <SelectContent>

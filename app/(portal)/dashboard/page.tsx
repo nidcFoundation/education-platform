@@ -62,7 +62,7 @@ export default async function ApplicantDashboard() {
             description={application ? `Application ID: ${application.id.slice(0, 8)}... · Status: ${application.status}` : "Start your journey today."}
             action={
                 <Link href="/application">
-                    <Button className="font-semibold">
+                    <Button className="font-semibold cursor-pointer py-4">
                         {application ? "Continue Application" : "Start Application"} <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                 </Link>

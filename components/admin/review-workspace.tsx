@@ -118,7 +118,7 @@ function getDocumentStatusClassName(status: DocumentStatus): string {
 }
 
 export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
-    const [decision, setDecision] = useState<ApplicationStatus>(application.status);
+    const [decision, setDecision] = useState<ApplicationStatus>(application.status as ApplicationStatus);
     const [requestedDecision, setRequestedDecision] = useState<ApplicationStatus | null>(null);
     const [feedback, setFeedback] = useState<string | null>(null);
     const [notes, setNotes] = useState(application.review_notes ?? "");
@@ -154,12 +154,14 @@ export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
         try {
             const { error } = await updateApplicationDecision(
                 application.id,
+                application.applicant_id,
                 nextDecision,
                 notes,
                 scores
             );
 
             if (error) {
+                setRequestedDecision(null);
                 setFeedback(`Error: ${error}`);
                 return;
             }

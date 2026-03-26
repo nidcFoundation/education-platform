@@ -90,6 +90,9 @@ export interface UploadedDocument {
     uploadedAt: string;
     status: DocumentStatus;
     owner?: string;
+    url?: string;
+    publicId?: string;
+    mimeType?: string;
 }
 
 export interface Application {
