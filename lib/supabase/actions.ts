@@ -999,6 +999,41 @@ export async function updateApplicationDecision(
     return { error: null };
 }
 
+export async function updateApplicationDocumentStatus(
+    applicationId: string,
+    documentId: string,
+    status: DocumentStatus
+): Promise<{ error: string | null }> {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+        return { error: "Unauthorized" };
+    }
+
+    const sanitizedApplicationId = applicationId.trim();
+    if (!sanitizedApplicationId) {
+        return { error: "Application ID is required." };
+    }
+
+    const sanitizedDocumentId = documentId.trim();
+    if (!sanitizedDocumentId) {
+        return { error: "Document ID is required." };
+    }
+
+    const { error: rpcError } = await supabase.rpc("update_application_document_status", {
+        p_application_id: sanitizedApplicationId,
+        p_document_id: sanitizedDocumentId,
+        p_status: status,
+    });
+
+    if (rpcError) {
+        return { error: rpcError.message };
+    }
+
+    return { error: null };
+}
+
 export async function allocateFunding(
     sponsorId: string,
     scholarId: string,

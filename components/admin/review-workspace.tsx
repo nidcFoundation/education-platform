@@ -27,20 +27,21 @@ import {
 import { useRouter } from "next/navigation";
 
 interface ReviewWorkspaceApplication {
-    id: string;
-    status: ApplicationStatus;
-    score?: number | null;
-    review_notes?: string | null;
-    review_scores?: Record<string, number> | null;
-    cohort_year?: string | number | null;
-    created_at: string;
-    documents?: UploadedDocument[];
-    profiles?: {
-        first_name?: string | null;
-        last_name?: string | null;
-        state?: string | null;
-        state_of_origin?: string | null;
-    } | null;
+  id: string;
+  applicant_id: string;
+  status: ApplicationStatus;
+  score?: number | null;
+  review_notes?: string | null;
+  review_scores?: Record<string, number> | null;
+  cohort_year?: string | number | null;
+  created_at: string;
+  documents?: UploadedDocument[];
+  profiles?: {
+    first_name?: string | null;
+    last_name?: string | null;
+    state?: string | null;
+    state_of_origin?: string | null;
+  } | null;
 }
 
 interface ReviewWorkspaceProps {
@@ -417,10 +418,7 @@ export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
                                     id="review-notes"
                                     rows={10}
                                     value={notes}
-                                    onChange={(event) => {
-                                        setNotes(event.target.value);
-                                        setFeedback("Internal notes updated.");
-                                    }}
+                                    onChange={(event) => setNotes(event.target.value)}
                                     placeholder="Add observations about mission fit, interview performance..."
                                 />
                             </div>
