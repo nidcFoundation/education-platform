@@ -27,6 +27,7 @@ interface ReviewWorkspaceProps {
 
 export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
     const [decision, setDecision] = useState<ApplicationStatus>(application.status as ApplicationStatus);
+    const [requestedDecision, setRequestedDecision] = useState<ApplicationStatus | null>(null);
     const [feedback, setFeedback] = useState<string | null>(null);
     const [notes, setNotes] = useState("");
     const [scores, setScores] = useState<Record<string, number>>({
@@ -45,6 +46,7 @@ export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
 
     const totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0);
     const totalPossibleScore = 100;
+    const displayedDecision = isSaving && requestedDecision ? requestedDecision : decision;
 
     function updateScore(label: string, rawValue: string, maxScore: number) {
         const nextValue = Number(rawValue);
@@ -60,16 +62,19 @@ export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
     }
 
     async function handleDecision(nextDecision: ApplicationStatus, message: string) {
+        setRequestedDecision(nextDecision);
         setIsSaving(true);
         try {
             const { error } = await updateApplicationDecision(
                 application.id,
+                application.applicant_id,
                 nextDecision,
                 notes,
                 scores
             );
 
             if (error) {
+                setRequestedDecision(null);
                 setFeedback(`Error: ${error}`);
             } else {
                 setDecision(nextDecision);
@@ -77,9 +82,11 @@ export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
                 router.refresh();
             }
         } catch (err: any) {
+            setRequestedDecision(null);
             setFeedback(`Error: ${err.message || "An unexpected error occurred."}`);
         } finally {
             setIsSaving(false);
+            setRequestedDecision(null);
         }
     }
 
@@ -98,7 +105,7 @@ export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
                     <CardHeader>
                         <div className="flex flex-wrap items-center gap-3">
                             <CardTitle>{application.profiles?.first_name} {application.profiles?.last_name}</CardTitle>
-                            <ApplicationStatusBadge status={decision} />
+                            <ApplicationStatusBadge status={displayedDecision} />
                         </div>
                         <CardDescription>
                             {application.id.slice(0, 8)} · Cohort {application.cohort_year}
@@ -148,15 +155,15 @@ export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
 
                         <div className="flex flex-wrap gap-3 pt-4">
                             <Button disabled={isSaving} type="button" onClick={() => handleDecision("shortlisted", "Candidate shortlisted for interview planning.")}>
-                                {isSaving && decision === "shortlisted" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {isSaving && requestedDecision === "shortlisted" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Shortlist
                             </Button>
                             <Button disabled={isSaving} type="button" variant="outline" onClick={() => handleDecision("accepted", "Candidate marked approved.")}>
-                                {isSaving && decision === "accepted" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {isSaving && requestedDecision === "accepted" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Approve
                             </Button>
                             <Button disabled={isSaving} type="button" variant="destructive" onClick={() => handleDecision("rejected", "Candidate marked rejected.")}>
-                                {isSaving && decision === "rejected" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {isSaving && requestedDecision === "rejected" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Reject
                             </Button>
                         </div>

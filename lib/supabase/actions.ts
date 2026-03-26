@@ -1,9 +1,99 @@
 "use server";
 
 import { createSupabaseServerClient } from "./server";
-import { Scholar, Milestone, Announcement, ImpactMetric, FundingRecord, ApplicationStatus } from "@/types";
+import {
+    Scholar,
+    Milestone,
+    Announcement,
+    ImpactMetric,
+    FundingRecord,
+    ApplicationStatus,
+    DocumentStatus,
+    DocumentType,
+    UploadedDocument,
+} from "@/types";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+function getProgramName(program: unknown): string {
+    if (!program || typeof program !== "object") return "";
+
+    const source = program as Record<string, unknown>;
+    const name = typeof source.name === "string" ? source.name.trim() : "";
+    if (name) return name;
+
+    return typeof source.title === "string" ? source.title.trim() : "";
+}
+
+function normalizeProgramRecord<T>(program: T): T {
+    const normalizedName = getProgramName(program);
+
+    if (!program || typeof program !== "object" || !normalizedName) {
+        return program;
+    }
+
+    const source = program as Record<string, unknown>;
+    if (typeof source.name === "string" && source.name.trim().length > 0) {
+        return program;
+    }
+
+    return {
+        ...source,
+        name: normalizedName,
+    } as T;
+}
+
+function normalizeProgramsList<T>(programs: T[] | null | undefined): T[] {
+    return (programs || []).map((program) => normalizeProgramRecord(program));
+}
+
+function normalizeProgramsRelation<T>(rows: T[] | null | undefined): T[] {
+    return (rows || []).map((row) => {
+        if (!row || typeof row !== "object") {
+            return row;
+        }
+
+        const source = row as Record<string, unknown>;
+        if (!source.programs || typeof source.programs !== "object") {
+            return row;
+        }
+
+        return {
+            ...source,
+            programs: normalizeProgramRecord(source.programs),
+        } as T;
+    });
+}
+
+function sortProgramsByName<T>(programs: T[]): T[] {
+    return [...programs].sort((a, b) =>
+        getProgramName(a).localeCompare(getProgramName(b), undefined, { sensitivity: "base" })
+    );
+}
+
+function formatSupabaseError(error: unknown): string {
+    if (!error || typeof error !== "object") {
+        return String(error || "Unknown error");
+    }
+
+    const source = error as Record<string, unknown>;
+    const parts = [
+        typeof source.message === "string" ? `message=${source.message}` : "",
+        typeof source.details === "string" && source.details ? `details=${source.details}` : "",
+        typeof source.hint === "string" && source.hint ? `hint=${source.hint}` : "",
+        typeof source.code === "string" && source.code ? `code=${source.code}` : "",
+    ].filter(Boolean);
+
+    if (parts.length > 0) {
+        return parts.join(" | ");
+    }
+
+    try {
+        return JSON.stringify(source);
+    } catch {
+        return "Unknown Supabase error";
+    }
+}
 
 function getDaysUntilDueDate(dueDate: string) {
     const today = new Date();
@@ -55,6 +145,115 @@ function getProfileSaveErrorMessage(rawMessage?: string) {
     return "Unable to save profile details right now. Please try again.";
 }
 
+const SUPPORTED_DOCUMENT_TYPES = new Set<DocumentType>([
+    "transcript",
+    "id",
+    "reference_letter",
+    "essay",
+    "jamb_result",
+    "award_letter",
+    "other",
+]);
+
+const SUPPORTED_DOCUMENT_STATUSES = new Set<DocumentStatus>([
+    "pending",
+    "verified",
+    "rejected",
+    "expiring",
+]);
+
+function isDocumentType(value: unknown): value is DocumentType {
+    return typeof value === "string" && SUPPORTED_DOCUMENT_TYPES.has(value as DocumentType);
+}
+
+function isDocumentStatus(value: unknown): value is DocumentStatus {
+    return typeof value === "string" && SUPPORTED_DOCUMENT_STATUSES.has(value as DocumentStatus);
+}
+
+function normalizeApplicationDocuments(value: unknown): UploadedDocument[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .flatMap((entry) => {
+            if (!entry || typeof entry !== "object") {
+                return [];
+            }
+
+            const source = entry as Record<string, unknown>;
+            const id = typeof source.id === "string" ? source.id.trim() : "";
+            const name = typeof source.name === "string" ? source.name.trim() : "";
+            const uploadedAtSource =
+                typeof source.uploadedAt === "string"
+                    ? source.uploadedAt
+                    : typeof source.updated_on === "string"
+                        ? source.updated_on
+                        : typeof source.created_at === "string"
+                            ? source.created_at
+                            : "";
+
+            if (!id || !name || !uploadedAtSource) {
+                return [];
+            }
+
+            const normalizedDocument: UploadedDocument = {
+                id,
+                type: isDocumentType(source.type) ? source.type : "other",
+                name,
+                size: typeof source.size === "number" && Number.isFinite(source.size) ? source.size : 0,
+                uploadedAt: uploadedAtSource,
+                status: isDocumentStatus(source.status) ? source.status : "pending",
+            };
+
+            if (typeof source.slot === "string" && source.slot.trim()) {
+                normalizedDocument.slot = source.slot.trim();
+            }
+
+            if (typeof source.owner === "string" && source.owner.trim()) {
+                normalizedDocument.owner = source.owner.trim();
+            }
+
+            if (typeof source.url === "string" && source.url.trim()) {
+                normalizedDocument.url = source.url.trim();
+            }
+
+            if (typeof source.publicId === "string" && source.publicId.trim()) {
+                normalizedDocument.publicId = source.publicId.trim();
+            }
+
+            if (typeof source.mimeType === "string" && source.mimeType.trim()) {
+                normalizedDocument.mimeType = source.mimeType.trim();
+            }
+
+            return [normalizedDocument];
+        })
+        .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+}
+
+function getApplicationDocumentsErrorMessage(rawMessage?: string, action: "save" | "delete" = "save") {
+    const message = (rawMessage || "").toLowerCase();
+    const isPermissionError =
+        message.includes("permission denied") ||
+        message.includes("row-level security") ||
+        message.includes("violates row-level security policy");
+    const isMissingDocumentsColumn =
+        message.includes("documents") &&
+        (message.includes("schema cache") || message.includes("column"));
+
+    if (isMissingDocumentsColumn) {
+        return "Application document storage is not set up yet. Run the latest database migrations and try again.";
+    }
+
+    if (isPermissionError) {
+        return action === "delete"
+            ? "You do not have permission to delete application documents right now. Please contact support or run the latest database migrations."
+            : "You do not have permission to save application documents right now. Please contact support or run the latest database migrations.";
+    }
+
+    return rawMessage || "An unexpected error occurred.";
+}
+
 export async function getScholarDashboardData(scholarId: string) {
     const supabase = await createSupabaseServerClient();
 
@@ -100,7 +299,7 @@ export async function getAdminDashboardData() {
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "applicant"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "donor"),
         supabase.from("applications").select("*, profiles(first_name, last_name, email)").order("created_at", { ascending: false }).limit(10),
-        supabase.from("cohorts").select("*, programs(name)").order("year", { ascending: false }),
+        supabase.from("cohorts").select("*, programs(*)").order("year", { ascending: false }),
         supabase.from("programs").select("*"),
         supabase.from("donor_details").select("commitment")
     ]);
@@ -117,8 +316,8 @@ export async function getAdminDashboardData() {
         counts,
         totalFunding,
         applications: applicationsRes.data || [],
-        cohorts: cohortsRes.data || [],
-        programs: programsRes.data || [],
+        cohorts: normalizeProgramsRelation(cohortsRes.data),
+        programs: sortProgramsByName(normalizeProgramsList(programsRes.data)),
     };
 }
 
@@ -133,17 +332,17 @@ export async function getDonorDashboardData(donorId: string) {
     ] = await Promise.all([
         supabase.from("profiles").select("*").eq("id", donorId).single(),
         supabase.from("donor_details").select("*").eq("id", donorId).single(),
-        supabase.from("funding_records").select("*, programs(name)").eq("sponsor_id", donorId),
+        supabase.from("funding_records").select("*, programs(*)").eq("sponsor_id", donorId),
         supabase.from("impact_metrics").select("*").limit(10) // Showing global impact for donors
     ]);
 
     const scholarIds = Array.from(new Set(
         (fundingRes.data || [])
-            .map((fr: any) => fr.scholar_id)
+            .map((fr: { scholar_id?: string | null }) => fr.scholar_id)
             .filter(Boolean)
     ));
 
-    let sponsoredScholars: any[] = [];
+    let sponsoredScholars: Array<Record<string, unknown>> = [];
     if (scholarIds.length > 0) {
         const { data } = await supabase.from("profiles").select("*").in("id", scholarIds);
         sponsoredScholars = data || [];
@@ -151,7 +350,7 @@ export async function getDonorDashboardData(donorId: string) {
 
     return {
         profile: { ...profileRes.data, ...detailsRes.data },
-        fundingRecords: fundingRes.data || [],
+        fundingRecords: normalizeProgramsRelation(fundingRes.data),
         sponsoredScholars,
         impactMetrics: impactRes.data || [],
     };
@@ -221,14 +420,13 @@ export async function getAdminPrograms() {
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
         .from("programs")
-        .select("*")
-        .order("name", { ascending: true });
+        .select("*");
 
     if (error) {
-        console.error("Error fetching admin programs:", error);
+        console.error("Error fetching admin programs:", formatSupabaseError(error));
         return [];
     }
-    return data;
+    return sortProgramsByName(normalizeProgramsList(data));
 }
 
 export async function getAdminCohorts() {
@@ -237,15 +435,15 @@ export async function getAdminCohorts() {
         .from("cohorts")
         .select(`
       *,
-      programs (name)
+      programs (*)
     `)
         .order("year", { ascending: false });
 
     if (error) {
-        console.error("Error fetching admin cohorts:", error);
+        console.error("Error fetching admin cohorts:", formatSupabaseError(error));
         return [];
     }
-    return data;
+    return normalizeProgramsRelation(data);
 }
 
 export async function getAdminFundingLedger() {
@@ -255,15 +453,15 @@ export async function getAdminFundingLedger() {
         .select(`
       *,
       profiles (first_name, last_name),
-      programs (name)
+      programs (*)
     `)
         .order("date", { ascending: false });
 
     if (error) {
-        console.error("Error fetching admin funding ledger:", error);
+        console.error("Error fetching admin funding ledger:", formatSupabaseError(error));
         return [];
     }
-    return data;
+    return normalizeProgramsRelation(data);
 }
 
 export async function getAdminApplications() {
@@ -329,7 +527,7 @@ export async function getApplicantDashboardData(userId: string) {
         supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
         supabase
             .from("applications")
-            .select("*, programs(name)")
+            .select("*, programs(*)")
             .eq("applicant_id", userId)
             .order("updated_at", { ascending: false })
             .limit(1)
@@ -337,7 +535,6 @@ export async function getApplicantDashboardData(userId: string) {
         supabase.from("announcements").select("*").or("audience.eq.all,audience.eq.applicants").order("created_at", { ascending: false }).limit(5),
         supabase.from("notifications").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(5),
         supabase.from("deadlines").select("*").or(`user_id.is.null,user_id.eq.${userId}`).order("due_date", { ascending: true }).limit(5),
-        // documents table is scholar-scoped (scholar_id); skip query for applicants
     ]);
 
     let applicationData = applicationRes.data;
@@ -359,10 +556,13 @@ export async function getApplicantDashboardData(userId: string) {
         }
     }
 
+    const documents = normalizeApplicationDocuments(applicationData?.documents);
+
     const application = applicationData
         ? {
             ...applicationData,
             step: applicationData.current_step,
+            documents,
         }
         : null;
 
@@ -377,7 +577,7 @@ export async function getApplicantDashboardData(userId: string) {
         announcements: announcementsRes.data || [],
         notifications: notificationsRes.data || [],
         deadlines,
-        documents: [],
+        documents,
     };
 }
 
@@ -422,8 +622,14 @@ export async function getPublicHomeData() {
 
 export async function getPublicPrograms() {
     const supabase = await createSupabaseServerClient();
-    const { data } = await supabase.from("programs").select("*").order("name", { ascending: true });
-    return data || [];
+    const { data, error } = await supabase.from("programs").select("*");
+
+    if (error) {
+        console.error("Error fetching public programs:", formatSupabaseError(error));
+        return [];
+    }
+
+    return sortProgramsByName(normalizeProgramsList(data));
 }
 
 export async function getPublicScholars() {
@@ -532,6 +738,133 @@ export async function submitApplication(): Promise<{ error: string | null }> {
     return { error: null };
 }
 
+interface SaveApplicationDocumentInput {
+    type: DocumentType;
+    slot: string;
+    name: string;
+    size: number;
+    url: string;
+    publicId: string;
+    mimeType?: string;
+}
+
+export async function saveApplicationDocument(
+    input: SaveApplicationDocumentInput
+): Promise<{ error: string | null }> {
+    const supabase = await createSupabaseServerClient();
+    const {
+        data: { user },
+        error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+        return { error: userError?.message || "You must be signed in to save this document." };
+    }
+
+    const { data: existingApplication, error: fetchError } = await supabase
+        .from("applications")
+        .select("id, current_step, documents")
+        .eq("applicant_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (fetchError) {
+        return { error: getApplicationDocumentsErrorMessage(fetchError.message, "save") };
+    }
+
+    const nextDocument: UploadedDocument = {
+        id: crypto.randomUUID(),
+        type: input.type,
+        slot: input.slot,
+        name: input.name,
+        size: input.size,
+        uploadedAt: new Date().toISOString(),
+        status: "pending",
+        owner: "Applicant",
+        url: input.url,
+        publicId: input.publicId,
+        mimeType: input.mimeType,
+    };
+
+    const nextDocuments = [
+        nextDocument,
+        ...normalizeApplicationDocuments(existingApplication?.documents).filter(
+            (document) => document.slot !== input.slot
+        ),
+    ];
+
+    const timestamp = new Date().toISOString();
+    const writeResult = existingApplication
+        ? await supabase
+            .from("applications")
+            .update({
+                current_step: Math.max(existingApplication.current_step ?? 1, 4),
+                last_saved_at: timestamp,
+                documents: nextDocuments,
+            })
+            .eq("id", existingApplication.id)
+        : await supabase.from("applications").insert({
+            applicant_id: user.id,
+            current_step: 4,
+            last_saved_at: timestamp,
+            documents: nextDocuments,
+        });
+
+    if (writeResult.error) {
+        return { error: getApplicationDocumentsErrorMessage(writeResult.error.message, "save") };
+    }
+
+    return { error: null };
+}
+
+export async function deleteApplicationDocument(documentId: string): Promise<{ error: string | null }> {
+    const supabase = await createSupabaseServerClient();
+    const {
+        data: { user },
+        error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+        return { error: userError?.message || "You must be signed in to delete this document." };
+    }
+
+    const { data: existingApplication, error: fetchError } = await supabase
+        .from("applications")
+        .select("id, current_step, documents")
+        .eq("applicant_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (fetchError) {
+        return { error: getApplicationDocumentsErrorMessage(fetchError.message, "delete") };
+    }
+
+    if (!existingApplication) {
+        return { error: "No application was found for this account." };
+    }
+
+    const nextDocuments = normalizeApplicationDocuments(existingApplication.documents).filter(
+        (document) => document.id !== documentId
+    );
+
+    const { error } = await supabase
+        .from("applications")
+        .update({
+            current_step: Math.max(existingApplication.current_step ?? 1, 4),
+            last_saved_at: new Date().toISOString(),
+            documents: nextDocuments,
+        })
+        .eq("id", existingApplication.id);
+
+    if (error) {
+        return { error: getApplicationDocumentsErrorMessage(error.message, "delete") };
+    }
+
+    return { error: null };
+}
+
 type ApplicationStepColumn = "personal_info" | "academic_background" | "essays";
 
 export async function saveApplicationStep(
@@ -622,6 +955,7 @@ export async function saveApplicationStep(
 
 export async function updateApplicationDecision(
     applicationId: string,
+    applicantId: string,
     decision: ApplicationStatus,
     notes: string,
     scores: Record<string, number>
@@ -633,26 +967,27 @@ export async function updateApplicationDecision(
         return { error: "Unauthorized" };
     }
 
-    const { error: appError, data: application } = await supabase
-        .from("applications")
-        .update({ status: decision, review_notes: notes })
-        .eq("id", applicationId)
-        .select()
-        .single();
+    const sanitizedApplicationId = applicationId.trim();
+    const sanitizedApplicantId = applicantId.trim();
 
-    if (appError) {
-        return { error: appError.message };
+    if (!sanitizedApplicationId) {
+        return { error: "Application ID is required." };
     }
 
-    if (decision === "accepted" && application) {
-        const { error: profileError } = await supabase
-            .from("profiles")
-            .update({ role: "scholar" })
-            .eq("id", application.applicant_id);
+    if (!sanitizedApplicantId) {
+        return { error: "Applicant ID is required." };
+    }
 
-        if (profileError) {
-            return { error: "Application updated, but failed to update user role." };
-        }
+    const { error: rpcError } = await supabase.rpc("update_application_decision", {
+        p_application_id: sanitizedApplicationId,
+        p_applicant_id: sanitizedApplicantId,
+        p_decision: decision,
+        p_notes: notes,
+        p_scores: scores,
+    });
+
+    if (rpcError) {
+        return { error: rpcError.message };
     }
 
     return { error: null };
@@ -671,16 +1006,40 @@ export async function allocateFunding(
         return { error: "Unauthorized" };
     }
 
-    const payload: any = {
-        sponsor_id: sponsorId,
-        scholar_id: scholarId,
-        amount,
+    const sanitizedSponsorId = typeof sponsorId === "string" ? sponsorId.trim() : "";
+    if (!sanitizedSponsorId) {
+        return { error: "Sponsor ID is required." };
+    }
+
+    const sanitizedScholarId = typeof scholarId === "string" ? scholarId.trim() : "";
+    if (!sanitizedScholarId) {
+        return { error: "Scholar ID is required." };
+    }
+
+    const sanitizedAmount = Number(amount);
+    if (!Number.isFinite(sanitizedAmount) || sanitizedAmount <= 0) {
+        return { error: "Amount must be a finite number greater than 0." };
+    }
+
+    let sanitizedProgramId: string | undefined;
+    if (programId !== undefined) {
+        sanitizedProgramId = typeof programId === "string" ? programId.trim() : "";
+
+        if (!sanitizedProgramId) {
+            return { error: "Program ID must be a non-empty string when provided." };
+        }
+    }
+
+    const payload: Record<string, string | number> = {
+        sponsor_id: sanitizedSponsorId,
+        scholar_id: sanitizedScholarId,
+        amount: sanitizedAmount,
         type: "disbursement",
         status: "completed",
     };
 
-    if (programId) {
-        payload.program_id = programId;
+    if (sanitizedProgramId) {
+        payload.program_id = sanitizedProgramId;
     }
 
     const { error } = await supabase
