@@ -9,24 +9,45 @@ import {
     ArrowLeft, ArrowRight, Upload, CheckCircle2, Clock, XCircle, Trash2, FileText, Info, AlertCircle
 } from "lucide-react";
 import { applicationSteps } from "@/lib/constants/application";
-import type { DocumentStatus, DocumentType } from "@/types";
+import type { DocumentStatus, DocumentType, UploadedDocument } from "@/types";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { deleteApplicationDocument, saveApplicationDocument } from "@/lib/supabase/actions";
 
 interface DocumentUploadFormProps {
-    documents: any[];
+    documents: UploadedDocument[];
 }
 
-const requiredDocuments: { type: DocumentType; label: string; description: string; required: boolean }[] = [
-    { type: "transcript", label: "Academic Transcripts / WAEC Result", description: "Certified copy of your final secondary school results.", required: true },
-    { type: "id", label: "Government-Issued ID", description: "National ID card, International Passport, or Birth Certificate.", required: true },
-    { type: "reference_letter", label: "Reference Letter 1 (Academic)", description: "Letter from a teacher, lecturer, or school principal.", required: true },
-    { type: "reference_letter", label: "Reference Letter 2 (Community)", description: "Letter from a community or civic leader.", required: true },
-    { type: "jamb_result", label: "JAMB / UTME Result", description: "Official JAMB slip or result notification.", required: true },
-    { type: "essay", label: "Statement of Purpose (Optional)", description: "Additional written statement.", required: false },
+interface RequiredDocumentDefinition {
+    slot: string;
+    type: DocumentType;
+    label: string;
+    description: string;
+    required: boolean;
+}
+
+const requiredDocuments: RequiredDocumentDefinition[] = [
+    { slot: "transcript", type: "transcript", label: "Academic Transcripts / WAEC Result", description: "Certified copy of your final secondary school results.", required: true },
+    { slot: "id", type: "id", label: "Government-Issued ID", description: "National ID card, International Passport, or Birth Certificate.", required: true },
+    { slot: "reference_letter_academic", type: "reference_letter", label: "Reference Letter 1 (Academic)", description: "Letter from a teacher, lecturer, or school principal.", required: true },
+    { slot: "reference_letter_community", type: "reference_letter", label: "Reference Letter 2 (Community)", description: "Letter from a community or civic leader.", required: true },
+    { slot: "jamb_result", type: "jamb_result", label: "JAMB / UTME Result", description: "Official JAMB slip or result notification.", required: true },
+    { slot: "essay", type: "essay", label: "Statement of Purpose (Optional)", description: "Additional written statement.", required: false },
 ];
+
+const requiredDocumentTypeCounts = requiredDocuments.reduce<Record<DocumentType, number>>((counts, document) => {
+    counts[document.type] = (counts[document.type] || 0) + 1;
+    return counts;
+}, {
+    transcript: 0,
+    id: 0,
+    reference_letter: 0,
+    essay: 0,
+    jamb_result: 0,
+    award_letter: 0,
+    other: 0,
+});
 
 const statusIcon: Record<DocumentStatus, React.ReactNode> = {
     verified: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
@@ -42,30 +63,20 @@ const statusLabel: Record<DocumentStatus, string> = {
     expiring: "Expiring Soon",
 };
 
-function getDocumentPermissionErrorMessage(rawMessage?: string, action: "upload" | "delete" = "upload") {
-    const message = (rawMessage || "").toLowerCase();
-    const isPermissionError =
-        message.includes("permission denied") ||
-        message.includes("row-level security") ||
-        message.includes("violates row-level security policy");
-    const isDocumentsTableError =
-        message.includes("document") ||
-        message.includes("documents");
-
-    if (isPermissionError && isDocumentsTableError) {
-        return action === "delete"
-            ? "You do not have permission to delete this document yet. Please contact support or run the latest database migrations."
-            : "You do not have permission to upload documents yet. Please contact support or run the latest database migrations.";
-    }
-
-    return rawMessage || "Unexpected error.";
-}
-
 export function DocumentUploadForm({ documents }: DocumentUploadFormProps) {
     const router = useRouter();
     const [loading, setLoading] = useState(false);
 
-    const handleUpload = (type: string) => {
+    const getUploadedDocument = (requirement: RequiredDocumentDefinition) =>
+        documents.find((document) => {
+            if (document.slot) {
+                return document.slot === requirement.slot;
+            }
+
+            return requiredDocumentTypeCounts[requirement.type] === 1 && document.type === requirement.type;
+        });
+
+    const handleUpload = (requirement: RequiredDocumentDefinition) => {
         if (loading) return;
 
         const input = document.createElement("input");
@@ -92,25 +103,15 @@ export function DocumentUploadForm({ documents }: DocumentUploadFormProps) {
             toast.info(`Uploading ${file.name}...`);
 
             try {
-                const supabase = getSupabaseBrowserClient();
-                const { data: auth, error: authError } = await supabase.auth.getUser();
-
-                if (authError || !auth.user) {
-                    toast.error("You must be signed in to upload documents.");
-                    return;
-                }
-
-                const { error } = await supabase.from("documents").insert({
-                    scholar_id: auth.user.id,
+                const { error } = await saveApplicationDocument({
                     name: file.name,
-                    type,
-                    status: "pending",
-                    updated_on: new Date().toISOString().slice(0, 10),
-                    owner: "Applicant",
+                    slot: requirement.slot,
+                    type: requirement.type,
+                    size: file.size,
                 });
 
                 if (error) {
-                    toast.error("Upload failed.", { description: getDocumentPermissionErrorMessage(error.message, "upload") });
+                    toast.error("Upload failed.", { description: error });
                     return;
                 }
 
@@ -133,22 +134,10 @@ export function DocumentUploadForm({ documents }: DocumentUploadFormProps) {
         toast.info("Deleting document...");
 
         try {
-            const supabase = getSupabaseBrowserClient();
-            const { data: auth, error: authError } = await supabase.auth.getUser();
-
-            if (authError || !auth.user) {
-                toast.error("You must be signed in to delete documents.");
-                return;
-            }
-
-            const { error } = await supabase
-                .from("documents")
-                .delete()
-                .eq("id", id)
-                .eq("scholar_id", auth.user.id);
+            const { error } = await deleteApplicationDocument(id);
 
             if (error) {
-                toast.error("Delete failed.", { description: getDocumentPermissionErrorMessage(error.message, "delete") });
+                toast.error("Delete failed.", { description: error });
                 return;
             }
 
@@ -175,7 +164,7 @@ export function DocumentUploadForm({ documents }: DocumentUploadFormProps) {
 
             <div className="space-y-4">
                 {requiredDocuments.map((doc, i) => {
-                    const uploaded = documents.find(d => d.type === doc.type);
+                    const uploaded = getUploadedDocument(doc);
                     return (
                         <Card key={i} className={`border ${uploaded ? "border-emerald-200/60" : "border-border/50"}`}>
                             <CardHeader className="pb-3 border-b">
@@ -213,7 +202,7 @@ export function DocumentUploadForm({ documents }: DocumentUploadFormProps) {
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-medium truncate">{uploaded.name}</p>
                                             <p className="text-xs text-muted-foreground">
-                                                Uploaded on {new Date(uploaded.updated_at || uploaded.updated_on).toLocaleDateString()}
+                                                Uploaded on {new Date(uploaded.uploadedAt).toLocaleDateString()}
                                             </p>
                                             {uploaded.status === "rejected" && (
                                                 <p className="text-xs text-red-600 font-medium mt-1 flex items-center gap-1">
@@ -227,7 +216,7 @@ export function DocumentUploadForm({ documents }: DocumentUploadFormProps) {
                                     </div>
                                 ) : (
                                     <div
-                                        onClick={() => handleUpload(doc.type)}
+                                        onClick={() => handleUpload(doc)}
                                         className="border-2 border-dashed border-muted-foreground/20 hover:border-primary/40 rounded-xl p-8 text-center transition-colors cursor-pointer group"
                                     >
                                         <div className="flex flex-col items-center gap-3">

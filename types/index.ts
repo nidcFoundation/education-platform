@@ -84,6 +84,7 @@ export interface EssaySubmission {
 export interface UploadedDocument {
     id: string;
     type: DocumentType;
+    slot?: string;
     name: string;
     size: number;
     uploadedAt: string;

@@ -1,7 +1,17 @@
 "use server";
 
 import { createSupabaseServerClient } from "./server";
-import { Scholar, Milestone, Announcement, ImpactMetric, FundingRecord, ApplicationStatus } from "@/types";
+import {
+    Scholar,
+    Milestone,
+    Announcement,
+    ImpactMetric,
+    FundingRecord,
+    ApplicationStatus,
+    DocumentStatus,
+    DocumentType,
+    UploadedDocument,
+} from "@/types";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -53,6 +63,122 @@ function getProfileSaveErrorMessage(rawMessage?: string) {
     }
 
     return "Unable to save profile details right now. Please try again.";
+}
+
+const SUPPORTED_DOCUMENT_TYPES = new Set<DocumentType>([
+    "transcript",
+    "id",
+    "reference_letter",
+    "essay",
+    "jamb_result",
+    "award_letter",
+    "other",
+]);
+
+const SUPPORTED_DOCUMENT_STATUSES = new Set<DocumentStatus>([
+    "pending",
+    "verified",
+    "rejected",
+    "expiring",
+]);
+
+function isDocumentType(value: unknown): value is DocumentType {
+    return typeof value === "string" && SUPPORTED_DOCUMENT_TYPES.has(value as DocumentType);
+}
+
+function isDocumentStatus(value: unknown): value is DocumentStatus {
+    return typeof value === "string" && SUPPORTED_DOCUMENT_STATUSES.has(value as DocumentStatus);
+}
+
+function getApplicationDocumentKey(document: Pick<UploadedDocument, "type" | "slot">): string {
+    return typeof document.slot === "string" && document.slot.trim() ? document.slot.trim() : document.type;
+}
+
+function normalizeApplicationDocuments(value: unknown): UploadedDocument[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value
+        .flatMap((entry) => {
+            if (!entry || typeof entry !== "object") {
+                return [];
+            }
+
+            const source = entry as Record<string, unknown>;
+            const id = typeof source.id === "string" ? source.id.trim() : "";
+            const name = typeof source.name === "string" ? source.name.trim() : "";
+            const uploadedAt =
+                typeof source.uploadedAt === "string"
+                    ? source.uploadedAt
+                    : typeof source.updated_at === "string"
+                        ? source.updated_at
+                        : typeof source.updated_on === "string"
+                            ? source.updated_on
+                            : typeof source.created_at === "string"
+                                ? source.created_at
+                                : "";
+
+            if (!id || !name || !uploadedAt) {
+                return [];
+            }
+
+            const document: UploadedDocument = {
+                id,
+                type: isDocumentType(source.type) ? source.type : "other",
+                name,
+                size: typeof source.size === "number" && Number.isFinite(source.size) ? source.size : 0,
+                uploadedAt,
+                status: isDocumentStatus(source.status) ? source.status : "pending",
+            };
+
+            if (typeof source.owner === "string" && source.owner.trim()) {
+                document.owner = source.owner.trim();
+            }
+
+            if (typeof source.slot === "string" && source.slot.trim()) {
+                document.slot = source.slot.trim();
+            }
+
+            return [document];
+        })
+        .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
+}
+
+function getApplicationDocumentsErrorMessage(rawMessage?: string, action: "save" | "delete" | "review" = "save") {
+    const message = (rawMessage || "").toLowerCase();
+    const isPermissionError =
+        message.includes("permission denied") ||
+        message.includes("row-level security") ||
+        message.includes("violates row-level security policy");
+    const isMissingDocumentsColumn =
+        message.includes("documents") &&
+        (message.includes("schema cache") || message.includes("column"));
+    const isMissingDocumentReviewFunction =
+        message.includes("update_application_document_status") &&
+        (message.includes("schema cache") || message.includes("function"));
+
+    if (isMissingDocumentsColumn) {
+        return "Application document storage is not set up yet. Run the latest database migrations and try again.";
+    }
+
+    if (isMissingDocumentReviewFunction) {
+        return "Application document review is not set up yet. Run the latest database migrations and try again.";
+    }
+
+    if (isPermissionError) {
+        if (action === "delete") {
+            return "You do not have permission to delete application documents right now. Please contact support or run the latest database migrations.";
+        }
+
+        if (action === "review") {
+            return "You do not have permission to review application documents right now. Please contact support or run the latest database migrations.";
+        }
+
+        return "You do not have permission to save application documents right now. Please contact support or run the latest database migrations.";
+    }
+
+    return rawMessage || "An unexpected error occurred.";
 }
 
 export async function getScholarDashboardData(scholarId: string) {
@@ -313,7 +439,13 @@ export async function getAdminApplicationById(id: string) {
         console.error("Error fetching admin application by id:", error);
         return null;
     }
-    return data;
+
+    return data
+        ? {
+            ...data,
+            documents: normalizeApplicationDocuments(data.documents),
+        }
+        : null;
 }
 
 export async function getApplicantDashboardData(userId: string) {
@@ -337,7 +469,6 @@ export async function getApplicantDashboardData(userId: string) {
         supabase.from("announcements").select("*").or("audience.eq.all,audience.eq.applicants").order("created_at", { ascending: false }).limit(5),
         supabase.from("notifications").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(5),
         supabase.from("deadlines").select("*").or(`user_id.is.null,user_id.eq.${userId}`).order("due_date", { ascending: true }).limit(5),
-        // documents table is scholar-scoped (scholar_id); skip query for applicants
     ]);
 
     let applicationData = applicationRes.data;
@@ -359,10 +490,13 @@ export async function getApplicantDashboardData(userId: string) {
         }
     }
 
+    const documents = normalizeApplicationDocuments(applicationData?.documents);
+
     const application = applicationData
         ? {
             ...applicationData,
             step: applicationData.current_step,
+            documents,
         }
         : null;
 
@@ -377,7 +511,7 @@ export async function getApplicantDashboardData(userId: string) {
         announcements: announcementsRes.data || [],
         notifications: notificationsRes.data || [],
         deadlines,
-        documents: [],
+        documents,
     };
 }
 
@@ -527,6 +661,195 @@ export async function submitApplication(): Promise<{ error: string | null }> {
 
     if (error) {
         return { error: getApplicationPermissionErrorMessage(error.message, "submit") };
+    }
+
+    return { error: null };
+}
+
+interface SaveApplicationDocumentInput {
+    type: DocumentType;
+    slot: string;
+    name: string;
+    size: number;
+}
+
+export async function saveApplicationDocument(
+    input: SaveApplicationDocumentInput
+): Promise<{ error: string | null }> {
+    const supabase = await createSupabaseServerClient();
+    const {
+        data: { user },
+        error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+        return { error: userError?.message || "You must be signed in to upload documents." };
+    }
+
+    const sanitizedSlot = input.slot.trim();
+    const sanitizedName = input.name.trim();
+    if (!isDocumentType(input.type)) {
+        return { error: "Invalid document type." };
+    }
+
+    if (!sanitizedSlot) {
+        return { error: "Document slot is required." };
+    }
+
+    if (!sanitizedName) {
+        return { error: "Document name is required." };
+    }
+
+    if (!Number.isFinite(input.size) || input.size <= 0) {
+        return { error: "Document size must be greater than 0." };
+    }
+
+    const { data: existingApplication, error: fetchError } = await supabase
+        .from("applications")
+        .select("id, current_step, documents")
+        .eq("applicant_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (fetchError) {
+        return { error: getApplicationDocumentsErrorMessage(fetchError.message, "save") };
+    }
+
+    const nextDocument: UploadedDocument = {
+        id: crypto.randomUUID(),
+        type: input.type,
+        slot: sanitizedSlot,
+        name: sanitizedName,
+        size: input.size,
+        uploadedAt: new Date().toISOString(),
+        status: "pending",
+        owner: "Applicant",
+    };
+
+    const nextDocumentKey = getApplicationDocumentKey(nextDocument);
+
+    const nextDocuments = [
+        nextDocument,
+        ...normalizeApplicationDocuments(existingApplication?.documents).filter(
+            (document) => getApplicationDocumentKey(document) !== nextDocumentKey
+        ),
+    ];
+
+    const timestamp = new Date().toISOString();
+    const writeResult = existingApplication
+        ? await supabase
+            .from("applications")
+            .update({
+                current_step: Math.max(existingApplication.current_step ?? 1, 4),
+                last_saved_at: timestamp,
+                documents: nextDocuments,
+            })
+            .eq("id", existingApplication.id)
+        : await supabase.from("applications").insert({
+            applicant_id: user.id,
+            current_step: 4,
+            last_saved_at: timestamp,
+            documents: nextDocuments,
+        });
+
+    if (writeResult.error) {
+        return { error: getApplicationDocumentsErrorMessage(writeResult.error.message, "save") };
+    }
+
+    return { error: null };
+}
+
+export async function deleteApplicationDocument(documentId: string): Promise<{ error: string | null }> {
+    const supabase = await createSupabaseServerClient();
+    const {
+        data: { user },
+        error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+        return { error: userError?.message || "You must be signed in to delete documents." };
+    }
+
+    const sanitizedDocumentId = documentId.trim();
+    if (!sanitizedDocumentId) {
+        return { error: "Document ID is required." };
+    }
+
+    const { data: existingApplication, error: fetchError } = await supabase
+        .from("applications")
+        .select("id, current_step, documents")
+        .eq("applicant_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (fetchError) {
+        return { error: getApplicationDocumentsErrorMessage(fetchError.message, "delete") };
+    }
+
+    if (!existingApplication) {
+        return { error: "No application was found for this account." };
+    }
+
+    const nextDocuments = normalizeApplicationDocuments(existingApplication.documents).filter(
+        (document) => document.id !== sanitizedDocumentId
+    );
+
+    const { error } = await supabase
+        .from("applications")
+        .update({
+            current_step: Math.max(existingApplication.current_step ?? 1, 4),
+            last_saved_at: new Date().toISOString(),
+            documents: nextDocuments,
+        })
+        .eq("id", existingApplication.id);
+
+    if (error) {
+        return { error: getApplicationDocumentsErrorMessage(error.message, "delete") };
+    }
+
+    return { error: null };
+}
+
+export async function updateApplicationDocumentStatus(
+    applicationId: string,
+    documentId: string,
+    status: DocumentStatus
+): Promise<{ error: string | null }> {
+    const supabase = await createSupabaseServerClient();
+    const {
+        data: { user },
+        error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+        return { error: userError?.message || "You must be signed in to review documents." };
+    }
+
+    const sanitizedApplicationId = applicationId.trim();
+    const sanitizedDocumentId = documentId.trim();
+
+    if (!sanitizedApplicationId) {
+        return { error: "Application ID is required." };
+    }
+
+    if (!sanitizedDocumentId) {
+        return { error: "Document ID is required." };
+    }
+
+    if (!isDocumentStatus(status)) {
+        return { error: "Invalid document status." };
+    }
+
+    const { error } = await supabase.rpc("update_application_document_status", {
+        p_application_id: sanitizedApplicationId,
+        p_document_id: sanitizedDocumentId,
+        p_status: status,
+    });
+
+    if (error) {
+        return { error: getApplicationDocumentsErrorMessage(error.message, "review") };
     }
 
     return { error: null };
