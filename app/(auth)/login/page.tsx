@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ArrowRight, CircleAlert, Lock, Mail, Shield } from "lucide-react";
 import { toast } from "sonner";
-import { getDefaultRedirectPath, getRoleFromMetadata } from "@/lib/auth/roles";
+import { getSafePostLoginRedirectPath, resolveUserRoleForSession } from "@/lib/auth/roles";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
@@ -50,11 +50,14 @@ export default function LoginPage() {
                 return;
             }
 
-            const role = getRoleFromMetadata(data.user.user_metadata);
+            const role = await resolveUserRoleForSession(supabase, data.user);
+            const nextPath = new URLSearchParams(window.location.search).get("next");
+            const redirectPath = getSafePostLoginRedirectPath(nextPath, role);
+
             toast.success("Welcome back!", {
                 description: "You have successfully signed in.",
             });
-            router.replace(getDefaultRedirectPath(role));
+            router.replace(redirectPath);
             router.refresh();
         } catch (error) {
             const message = error instanceof Error ? error.message : "Unable to sign you in right now.";

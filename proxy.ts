@@ -4,8 +4,8 @@ import { NextResponse } from "next/server";
 import {
     canAccessPath,
     getDefaultRedirectPath,
-    getRoleFromMetadata,
     isProtectedPath,
+    resolveUserRoleForSession,
 } from "@/lib/auth/roles";
 
 export async function proxy(request: NextRequest) {
@@ -52,7 +52,12 @@ export async function proxy(request: NextRequest) {
         return response;
     }
 
-    const role = getRoleFromMetadata(user.user_metadata);
+    const requiresRoleCheck = isAuthRoute || isProtectedPath(pathname);
+    if (!requiresRoleCheck) {
+        return response;
+    }
+
+    const role = await resolveUserRoleForSession(supabase, user);
 
     if (isAuthRoute) {
         return NextResponse.redirect(new URL(getDefaultRedirectPath(role), request.url));

@@ -2,7 +2,6 @@ import Link from "next/link";
 import { MetricCard } from "@/components/cards/metric-card";
 import { HorizontalBarChart } from "@/components/donor/transparency-charts";
 import { PageContainer } from "@/components/layout/page-container";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -23,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { Banknote, Briefcase, Flag, TrendingUp } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getDefaultRedirectPath, resolveUserRoleForSession } from "@/lib/auth/roles";
 import { getAdminScholars } from "@/lib/supabase/actions";
 import { redirect } from "next/navigation";
 
@@ -34,22 +34,9 @@ export default async function ScholarManagementPage() {
     redirect("/login");
   }
 
-  const metadataRole = typeof user.user_metadata?.role === "string"
-    ? user.user_metadata.role
-    : null;
-
-  let role = metadataRole;
-  if (!role) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    role = profile?.role ?? null;
-  }
-
+  const role = await resolveUserRoleForSession(supabase, user);
   if (role !== "admin") {
-    redirect("/login");
+    redirect(getDefaultRedirectPath(role));
   }
 
   const scholars = await getAdminScholars();

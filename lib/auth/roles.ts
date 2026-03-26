@@ -1,3 +1,5 @@
+import type { SupabaseClient, User } from "@supabase/supabase-js";
+
 export const AUTH_INTENTS = ["applicant", "donor", "partner"] as const;
 
 export type AuthIntent = (typeof AUTH_INTENTS)[number];
@@ -15,9 +17,28 @@ export type AppRole = (typeof APP_ROLES)[number];
 
 const APPLICANT_PREFIXES = ["/dashboard", "/application", "/status", "/notifications", "/settings"];
 const ADMIN_ROLES: AppRole[] = ["admin", "reviewer", "partner"];
+const AUTH_ROUTES = ["/login", "/signup"];
+
+type RoleMetadata = Record<string, unknown>;
+type ProfileRoleRow = {
+    role?: unknown;
+    account_type?: unknown;
+};
 
 function matchesProtectedPrefix(pathname: string, prefix: string): boolean {
     return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+function toAppRole(value: unknown): AppRole | null {
+    if (typeof value !== "string") return null;
+    return APP_ROLES.includes(value as AppRole) ? (value as AppRole) : null;
+}
+
+function extractRoleFromMetadata(metadata: unknown): AppRole | null {
+    if (!metadata || typeof metadata !== "object") return null;
+
+    const source = metadata as RoleMetadata;
+    return toAppRole(source.role) ?? toAppRole(source.account_type);
 }
 
 export function isAuthIntent(value: string | null): value is AuthIntent {
@@ -26,6 +47,66 @@ export function isAuthIntent(value: string | null): value is AuthIntent {
 
 export function getRoleForIntent(intent: AuthIntent): AppRole {
     return intent;
+}
+
+export function resolveRoleFromSources(params: {
+    profileRole?: unknown;
+    profileAccountType?: unknown;
+    userMetadata?: unknown;
+    appMetadata?: unknown;
+}): AppRole {
+    return (
+        toAppRole(params.profileRole) ??
+        toAppRole(params.profileAccountType) ??
+        extractRoleFromMetadata(params.userMetadata) ??
+        extractRoleFromMetadata(params.appMetadata) ??
+        "applicant"
+    );
+}
+
+export async function resolveUserRoleForSession(
+    supabase: SupabaseClient,
+    user: Pick<User, "id" | "user_metadata" | "app_metadata">
+): Promise<AppRole> {
+    const { data: rawProfile, error } = await supabase
+        .from("profiles")
+        .select("role, account_type")
+        .eq("id", user.id)
+        .maybeSingle();
+
+    if (error) {
+        throw new Error(`Failed to resolve user role for session: ${error.message}`);
+    }
+
+    const profile = rawProfile as ProfileRoleRow | null;
+
+    return resolveRoleFromSources({
+        profileRole: profile?.role,
+        profileAccountType: profile?.account_type,
+        userMetadata: user.user_metadata,
+        appMetadata: user.app_metadata,
+    });
+}
+
+export function getSafePostLoginRedirectPath(nextPath: string | null | undefined, role: AppRole): string {
+    const defaultPath = getDefaultRedirectPath(role);
+
+    if (!nextPath) return defaultPath;
+
+    const normalizedPath = nextPath.trim();
+    if (!normalizedPath.startsWith("/") || normalizedPath.startsWith("//")) return defaultPath;
+
+    const queryIndex = normalizedPath.indexOf("?");
+    const hashIndex = normalizedPath.indexOf("#");
+    const splitIndex = [queryIndex, hashIndex]
+        .filter((value) => value >= 0)
+        .sort((a, b) => a - b)[0];
+    const pathname = splitIndex === undefined ? normalizedPath : normalizedPath.slice(0, splitIndex);
+
+    if (!pathname || AUTH_ROUTES.includes(pathname)) return defaultPath;
+    if (isProtectedPath(pathname) && !canAccessPath(pathname, role)) return defaultPath;
+
+    return normalizedPath;
 }
 
 export function getDefaultRedirectPath(role?: string | null): string {
@@ -45,19 +126,7 @@ export function getDefaultRedirectPath(role?: string | null): string {
 }
 
 export function getRoleFromMetadata(metadata: unknown): AppRole {
-    if (metadata && typeof metadata === "object") {
-        const candidateRole = "role" in metadata ? metadata.role : null;
-        if (typeof candidateRole === "string" && APP_ROLES.includes(candidateRole as AppRole)) {
-            return candidateRole as AppRole;
-        }
-
-        const candidateType = "account_type" in metadata ? metadata.account_type : null;
-        if (typeof candidateType === "string" && APP_ROLES.includes(candidateType as AppRole)) {
-            return candidateType as AppRole;
-        }
-    }
-
-    return "applicant";
+    return extractRoleFromMetadata(metadata) ?? "applicant";
 }
 
 export function isProtectedPath(pathname: string): boolean {

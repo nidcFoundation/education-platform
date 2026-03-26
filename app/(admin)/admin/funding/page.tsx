@@ -17,8 +17,9 @@ import {
 } from "@/components/ui/table";
 import { AlertCircle, Banknote, Briefcase, WalletCards } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getAdminFundingLedger } from "@/lib/supabase/actions";
+import { getAdminFundingLedger, getAdminPrograms, getAdminScholars, getAdminSponsors } from "@/lib/supabase/actions";
 import { redirect } from "next/navigation";
+import { AllocateFundingDialog } from "@/components/admin/allocate-funding-dialog";
 
 function getFundingStatusClass(status: string) {
     if (status === "completed" || status === "Disbursed") return "bg-emerald-100 text-emerald-800";
@@ -35,6 +36,9 @@ export default async function FundingManagementPage() {
     }
 
     const ledger = await getAdminFundingLedger();
+    const sponsors = await getAdminSponsors();
+    const scholars = await getAdminScholars();
+    const programs = await getAdminPrograms();
 
     const committed = ledger.filter((l: any) => l.status === "pending" || l.status === "Committed").reduce((acc: number, l: any) => acc + Number(l.amount), 0);
     const disbursed = ledger.filter((l: any) => l.status === "completed" || l.status === "Disbursed").reduce((acc: number, l: any) => acc + Number(l.amount), 0);
@@ -67,9 +71,12 @@ export default async function FundingManagementPage() {
             title="Funding Management"
             description="Manage allocations, disbursements, sponsor coverage, and funding watchlists across the platform."
             action={
-                <Button asChild>
-                    <Link href="/admin/sponsors">Open Sponsors</Link>
-                </Button>
+                <div className="flex items-center gap-3">
+                    <Button asChild variant="outline">
+                        <Link href="/admin/sponsors">Open Sponsors</Link>
+                    </Button>
+                    <AllocateFundingDialog sponsors={sponsors} scholars={scholars} programs={programs} />
+                </div>
             }
         >
             <div className="space-y-6">

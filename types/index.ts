@@ -84,11 +84,15 @@ export interface EssaySubmission {
 export interface UploadedDocument {
     id: string;
     type: DocumentType;
+    slot?: string;
     name: string;
     size: number;
     uploadedAt: string;
     status: DocumentStatus;
     owner?: string;
+    url?: string;
+    publicId?: string;
+    mimeType?: string;
 }
 
 export interface Application {

@@ -1,36 +1,29 @@
 import Link from "next/link";
 import { PageContainer } from "@/components/layout/page-container";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { getDefaultRedirectPath, resolveUserRoleForSession } from "@/lib/auth/roles";
 import { getAdminScholars } from "@/lib/supabase/actions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
+type AdminScholar = Awaited<ReturnType<typeof getAdminScholars>>[number];
+
 export default async function ScholarProfilesPage() {
     const supabase = await createSupabaseServerClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const sessionUser = session?.user;
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!sessionUser) {
+    if (!user) {
         redirect("/login");
     }
 
-    const hasAdminFlag = [sessionUser.user_metadata?.is_admin, sessionUser.app_metadata?.is_admin].some(
-        (value) => value === true || (typeof value === "string" && value.toLowerCase() === "true")
-    );
-    const hasAdminRole = [
-        sessionUser.user_metadata?.role,
-        sessionUser.app_metadata?.role,
-        sessionUser.user_metadata?.account_type,
-        sessionUser.app_metadata?.account_type,
-    ].some((value) => typeof value === "string" && value.toLowerCase() === "admin");
-
-    if (!hasAdminFlag && !hasAdminRole) {
-        redirect("/dashboard");
+    const role = await resolveUserRoleForSession(supabase, user);
+    if (role !== "admin") {
+        redirect(getDefaultRedirectPath(role));
     }
 
     const scholars = await getAdminScholars();
@@ -55,7 +48,7 @@ export default async function ScholarProfilesPage() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {scholars.length > 0 ? (
-                                scholars.map((scholar: any) => (
+                                scholars.map((scholar: AdminScholar) => (
                                     <div
                                         key={scholar.id}
                                         className="block rounded-xl border bg-background p-4 transition-colors hover:bg-muted/20 cursor-pointer"

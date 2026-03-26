@@ -17,7 +17,9 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import type { ApplicationStatus } from "@/types";
-import { CalendarDays, ClipboardPen, FileText, UserCheck } from "lucide-react";
+import { CalendarDays, ClipboardPen, FileText, UserCheck, Loader2 } from "lucide-react";
+import { updateApplicationDecision } from "@/lib/supabase/actions";
+import { useRouter } from "next/navigation";
 
 interface ReviewWorkspaceProps {
     application: any;
@@ -25,6 +27,7 @@ interface ReviewWorkspaceProps {
 
 export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
     const [decision, setDecision] = useState<ApplicationStatus>(application.status as ApplicationStatus);
+    const [requestedDecision, setRequestedDecision] = useState<ApplicationStatus | null>(null);
     const [feedback, setFeedback] = useState<string | null>(null);
     const [notes, setNotes] = useState("");
     const [scores, setScores] = useState<Record<string, number>>({
@@ -32,6 +35,8 @@ export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
         "Service Potential": 0,
         "Mission Fit": 0
     });
+    const [isSaving, setIsSaving] = useState(false);
+    const router = useRouter();
 
     const rubric = [
         { label: "Academic Readiness", note: "Previous grades and technical foundation", max: 40 },
@@ -41,6 +46,7 @@ export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
 
     const totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0);
     const totalPossibleScore = 100;
+    const displayedDecision = isSaving && requestedDecision ? requestedDecision : decision;
 
     function updateScore(label: string, rawValue: string, maxScore: number) {
         const nextValue = Number(rawValue);
@@ -55,9 +61,33 @@ export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
         setFeedback("Review draft saved to local state. Integration with database pending Phase 2.");
     }
 
-    function handleDecision(nextDecision: ApplicationStatus, message: string) {
-        setDecision(nextDecision);
-        setFeedback(message);
+    async function handleDecision(nextDecision: ApplicationStatus, message: string) {
+        setRequestedDecision(nextDecision);
+        setIsSaving(true);
+        try {
+            const { error } = await updateApplicationDecision(
+                application.id,
+                application.applicant_id,
+                nextDecision,
+                notes,
+                scores
+            );
+
+            if (error) {
+                setRequestedDecision(null);
+                setFeedback(`Error: ${error}`);
+            } else {
+                setDecision(nextDecision);
+                setFeedback(message);
+                router.refresh();
+            }
+        } catch (err: any) {
+            setRequestedDecision(null);
+            setFeedback(`Error: ${err.message || "An unexpected error occurred."}`);
+        } finally {
+            setIsSaving(false);
+            setRequestedDecision(null);
+        }
     }
 
     return (
@@ -75,7 +105,7 @@ export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
                     <CardHeader>
                         <div className="flex flex-wrap items-center gap-3">
                             <CardTitle>{application.profiles?.first_name} {application.profiles?.last_name}</CardTitle>
-                            <ApplicationStatusBadge status={decision} />
+                            <ApplicationStatusBadge status={displayedDecision} />
                         </div>
                         <CardDescription>
                             {application.id.slice(0, 8)} · Cohort {application.cohort_year}
@@ -124,13 +154,16 @@ export function ReviewWorkspace({ application }: ReviewWorkspaceProps) {
                         </div>
 
                         <div className="flex flex-wrap gap-3 pt-4">
-                            <Button type="button" onClick={() => handleDecision("shortlisted", "Candidate shortlisted for interview planning.")}>
+                            <Button disabled={isSaving} type="button" onClick={() => handleDecision("shortlisted", "Candidate shortlisted for interview planning.")}>
+                                {isSaving && requestedDecision === "shortlisted" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Shortlist
                             </Button>
-                            <Button type="button" variant="outline" onClick={() => handleDecision("accepted", "Candidate marked approved.")}>
+                            <Button disabled={isSaving} type="button" variant="outline" onClick={() => handleDecision("accepted", "Candidate marked approved.")}>
+                                {isSaving && requestedDecision === "accepted" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Approve
                             </Button>
-                            <Button type="button" variant="destructive" onClick={() => handleDecision("rejected", "Candidate marked rejected.")}>
+                            <Button disabled={isSaving} type="button" variant="destructive" onClick={() => handleDecision("rejected", "Candidate marked rejected.")}>
+                                {isSaving && requestedDecision === "rejected" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Reject
                             </Button>
                         </div>
