@@ -16,12 +16,33 @@ import {
 import { ClipboardCheck, Clock3, FileCheck2, Users } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getAdminApplications } from "@/lib/supabase/actions";
+import { resolveUserRoleForSession } from "@/lib/auth/roles";
 import { redirect } from "next/navigation";
 
-function getPriorityClass(priority: string) {
-    if (priority === "High") return "bg-red-100 text-red-800";
-    if (priority === "Medium") return "bg-amber-100 text-amber-800";
-    return "bg-slate-100 text-slate-800";
+type AdminApplication = Awaited<ReturnType<typeof getAdminApplications>>[number];
+
+function isPendingReviewStatus(status: string) {
+    return status === "submitted" || status === "under_review";
+}
+
+function isInterviewStageStatus(status: string) {
+    return status === "interview_stage";
+}
+
+function isDecisionReadyStatus(status: string) {
+    return status === "shortlisted";
+}
+
+function getScoreLabel(score: unknown) {
+    return typeof score === "number" && Number.isFinite(score) ? `${score}/100` : "Awaiting";
+}
+
+function getCohortLabel(cohortYear: unknown) {
+    if (typeof cohortYear === "number" || typeof cohortYear === "string") {
+        return `Cohort ${cohortYear}`;
+    }
+
+    return "Cohort unassigned";
 }
 
 export default async function ApplicationsManagementPage() {
@@ -32,12 +53,17 @@ export default async function ApplicationsManagementPage() {
         redirect("/login");
     }
 
+    const role = await resolveUserRoleForSession(supabase, user);
+    if (role !== "admin" && role !== "reviewer") {
+        redirect("/admin");
+    }
+
     const applications = await getAdminApplications();
 
     const totalApplicants = applications.length;
-    const pendingReview = applications.filter((a: any) => a.status === "pending").length;
-    const interviewStage = applications.filter((a: any) => a.status === "interviewing").length;
-    const decisionReady = applications.filter((a: any) => a.status === "shortlisted").length;
+    const pendingReview = applications.filter((application: AdminApplication) => isPendingReviewStatus(application.status)).length;
+    const interviewStage = applications.filter((application: AdminApplication) => isInterviewStageStatus(application.status)).length;
+    const decisionReady = applications.filter((application: AdminApplication) => isDecisionReadyStatus(application.status)).length;
 
     const applicationMetrics = [
         { title: "Total Applicants", value: totalApplicants.toLocaleString(), description: "Across open application windows", icon: Users },
@@ -47,10 +73,32 @@ export default async function ApplicationsManagementPage() {
     ];
 
     const pipelineData = [
-        { label: "Intake", value: 100, color: "#475569" },
-        { label: "Screening", value: Math.round((applications.filter((a: any) => a.status !== "pending").length / (totalApplicants || 1)) * 100), color: "#0284c7" },
-        { label: "Interview", value: Math.round((applications.filter((a: any) => ["interviewing", "shortlisted", "accepted"].includes(a.status)).length / (totalApplicants || 1)) * 100), color: "#d97706" },
-        { label: "Offer", value: Math.round((applications.filter((a: any) => a.status === "accepted").length / (totalApplicants || 1)) * 100), color: "#0f766e" },
+        { label: "Intake", value: totalApplicants > 0 ? 100 : 0, color: "#475569" },
+        {
+            label: "Screening",
+            value: Math.round(
+                (applications.filter((application: AdminApplication) => application.status !== "draft").length / (totalApplicants || 1)) * 100
+            ),
+            color: "#0284c7",
+        },
+        {
+            label: "Interview",
+            value: Math.round(
+                (
+                    applications.filter((application: AdminApplication) =>
+                        ["interview_stage", "shortlisted", "accepted"].includes(application.status)
+                    ).length / (totalApplicants || 1)
+                ) * 100
+            ),
+            color: "#d97706",
+        },
+        {
+            label: "Offer",
+            value: Math.round(
+                (applications.filter((application: AdminApplication) => application.status === "accepted").length / (totalApplicants || 1)) * 100
+            ),
+            color: "#0f766e",
+        },
     ];
 
     return (
@@ -128,7 +176,7 @@ export default async function ApplicationsManagementPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {applications.map((application: any) => (
+                                {applications.map((application: AdminApplication) => (
                                     <TableRow key={application.id}>
                                         <TableCell>
                                             <div>
@@ -138,16 +186,17 @@ export default async function ApplicationsManagementPage() {
                                                 <p className="text-xs text-muted-foreground">{application.id.slice(0, 8)}</p>
                                             </div>
                                         </TableCell>
-                                        <TableCell>{application.profiles?.email}</TableCell>
+                                        <TableCell>{application.profiles?.email || "No email available"}</TableCell>
                                         <TableCell>
                                             <div>
-                                                <p>Cohort {application.cohort_year}</p>
+                                                <p>{getCohortLabel(application.cohort_year)}</p>
+                                                <p className="text-xs text-muted-foreground">Step {application.current_step ?? "N/A"}</p>
                                             </div>
                                         </TableCell>
                                         <TableCell>
                                             <ApplicationStatusBadge status={application.status} />
                                         </TableCell>
-                                        <TableCell>{application.score === null ? "Awaiting" : `${application.score}/100`}</TableCell>
+                                        <TableCell>{getScoreLabel(application.score)}</TableCell>
                                     </TableRow>
                                 ))}
                                 {applications.length === 0 && (

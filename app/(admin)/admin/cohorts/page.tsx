@@ -17,6 +17,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getAdminCohorts } from "@/lib/supabase/actions";
 import { redirect } from "next/navigation";
 
+type AdminCohort = Awaited<ReturnType<typeof getAdminCohorts>>[number];
+
 export default async function CohortsManagementPage() {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -27,11 +29,11 @@ export default async function CohortsManagementPage() {
 
     const cohorts = await getAdminCohorts();
 
-    const totalScholars = cohorts.reduce((acc: number, c: any) => acc + (c.active_scholars_count || 0), 0);
+    const totalScholars = cohorts.reduce((acc: number, c: AdminCohort) => acc + (c.active_scholars_count || 0), 0);
     const avgReviewCompletion = cohorts.length > 0
-        ? (cohorts.reduce((acc: number, c: any) => acc + (c.review_completion_percentage || 0), 0) / cohorts.length).toFixed(0)
+        ? (cohorts.reduce((acc: number, c: AdminCohort) => acc + (c.review_completion_percentage || 0), 0) / cohorts.length).toFixed(0)
         : "0";
-    const totalApplicants = cohorts.reduce((acc: number, c: any) => acc + (c.applicants_count || 0), 0);
+    const totalApplicants = cohorts.reduce((acc: number, c: AdminCohort) => acc + (c.applicants_count || 0), 0);
 
     const cohortMetrics = [
         { title: "Live Cohorts", value: cohorts.length.toString(), description: "Active cycle coverage", icon: GraduationCap },
@@ -40,7 +42,7 @@ export default async function CohortsManagementPage() {
         { title: "Readiness Focus", value: "Interviews", description: "Current programme bottleneck", icon: Flag },
     ];
 
-    const cohortDistribution = cohorts.map((c: any) => ({
+    const cohortDistribution = cohorts.map((c: AdminCohort) => ({
         label: c.year.toString(),
         value: c.active_scholars_count || 0,
         color: c.year === 2026 ? "#dc2626" : c.year === 2025 ? "#d97706" : c.year === 2024 ? "#0284c7" : "#0f766e",
@@ -93,10 +95,10 @@ export default async function CohortsManagementPage() {
                             <CardDescription>Operational focus by cohort stage, from close-out to onboarding.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {cohorts.map((cohort: any) => (
+                            {cohorts.map((cohort: AdminCohort) => (
                                 <div key={cohort.id} className="rounded-xl border bg-background p-4">
                                     <div className="flex items-center justify-between gap-4">
-                                        <p className="font-medium">Cohort {cohort.year} ({cohort.programs?.name || "Program"})</p>
+                                        <p className="font-medium">Cohort {cohort.year} ({cohort.programs?.name || "Program unassigned"})</p>
                                         <span className="text-sm font-semibold">{cohort.review_completion_percentage || 0}% complete</span>
                                     </div>
                                     <p className="mt-2 text-sm text-muted-foreground">{cohort.phase || "—"}</p>
@@ -126,10 +128,10 @@ export default async function CohortsManagementPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {cohorts.map((cohort: any) => (
+                                {cohorts.map((cohort: AdminCohort) => (
                                     <TableRow key={cohort.id}>
                                         <TableCell className="font-medium">{cohort.year}</TableCell>
-                                        <TableCell>{cohort.programs?.name}</TableCell>
+                                        <TableCell>{cohort.programs?.name || "Program unassigned"}</TableCell>
                                         <TableCell>{cohort.phase}</TableCell>
                                         <TableCell>{cohort.applicants_count}</TableCell>
                                         <TableCell>{cohort.active_scholars_count}</TableCell>
