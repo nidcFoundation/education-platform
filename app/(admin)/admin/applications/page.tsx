@@ -55,15 +55,16 @@ export default async function ApplicationsManagementPage() {
 
     const role = await resolveUserRoleForSession(supabase, user);
     if (role !== "admin" && role !== "reviewer") {
-        redirect("/admin");
+        redirect("/admin"); // Or wherever safe
     }
 
     const applications = await getAdminApplications();
+    const visibleApplications = applications.filter((application: AdminApplication) => application.status !== "draft");
 
-    const totalApplicants = applications.length;
-    const pendingReview = applications.filter((application: AdminApplication) => isPendingReviewStatus(application.status)).length;
-    const interviewStage = applications.filter((application: AdminApplication) => isInterviewStageStatus(application.status)).length;
-    const decisionReady = applications.filter((application: AdminApplication) => isDecisionReadyStatus(application.status)).length;
+    const totalApplicants = visibleApplications.length;
+    const pendingReview = visibleApplications.filter((application: AdminApplication) => isPendingReviewStatus(application.status)).length;
+    const interviewStage = visibleApplications.filter((application: AdminApplication) => isInterviewStageStatus(application.status)).length;
+    const decisionReady = visibleApplications.filter((application: AdminApplication) => isDecisionReadyStatus(application.status)).length;
 
     const applicationMetrics = [
         { title: "Total Applicants", value: totalApplicants.toLocaleString(), description: "Across open application windows", icon: Users },
@@ -77,7 +78,9 @@ export default async function ApplicationsManagementPage() {
         {
             label: "Screening",
             value: Math.round(
-                (applications.filter((application: AdminApplication) => application.status !== "draft").length / (totalApplicants || 1)) * 100
+                (visibleApplications.filter((application: AdminApplication) =>
+                    !["submitted"].includes(application.status)
+                ).length / (totalApplicants || 1)) * 100
             ),
             color: "#0284c7",
         },
@@ -85,7 +88,7 @@ export default async function ApplicationsManagementPage() {
             label: "Interview",
             value: Math.round(
                 (
-                    applications.filter((application: AdminApplication) =>
+                    visibleApplications.filter((application: AdminApplication) =>
                         ["interview_stage", "shortlisted", "accepted"].includes(application.status)
                     ).length / (totalApplicants || 1)
                 ) * 100
@@ -95,7 +98,7 @@ export default async function ApplicationsManagementPage() {
         {
             label: "Offer",
             value: Math.round(
-                (applications.filter((application: AdminApplication) => application.status === "accepted").length / (totalApplicants || 1)) * 100
+                (visibleApplications.filter((application: AdminApplication) => application.status === "accepted").length / (totalApplicants || 1)) * 100
             ),
             color: "#0f766e",
         },
@@ -176,7 +179,7 @@ export default async function ApplicationsManagementPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {applications.map((application: AdminApplication) => (
+                                {visibleApplications.map((application: AdminApplication) => (
                                     <TableRow key={application.id}>
                                         <TableCell>
                                             <div>
@@ -199,7 +202,7 @@ export default async function ApplicationsManagementPage() {
                                         <TableCell>{getScoreLabel(application.score)}</TableCell>
                                     </TableRow>
                                 ))}
-                                {applications.length === 0 && (
+                                {visibleApplications.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={5} className="text-center py-6 text-muted-foreground text-sm">
                                             No applications submitted yet.

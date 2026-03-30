@@ -36,7 +36,14 @@ export default async function StartApplicationPage() {
   // Default values if no application exists yet
   const currentStep = application?.step || application?.current_step || 1;
   const status = application?.status || "draft";
-  const programName = application?.program_id || "Not Started";
+  const programName =
+    application?.program_name ||
+    application?.programChoice ||
+    application?.program_choice || // Fallback for case inconsistency
+    "Not Started";
+  const cohortLabel = application?.cohort_year
+    ? `Cohort ${application.cohort_year}`
+    : "Cohort Pending";
   const appId = application?.id
     ? `NTDI-${application.id.slice(0, 8)}`
     : "New Application";
@@ -64,7 +71,7 @@ export default async function StartApplicationPage() {
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge variant="outline">2025 Cohort</Badge>
+                <Badge variant="outline">{cohortLabel}</Badge>
                 <Badge variant="secondary">Deadline: April 30, 2026</Badge>
               </div>
             </div>
@@ -85,24 +92,22 @@ export default async function StartApplicationPage() {
             return (
               <Card
                 key={step.step}
-                className={`border transition-colors ${
-                  isActive
+                className={`border transition-colors ${isActive
                     ? "border-primary/40 shadow-sm"
                     : isCompleted
-                    ? "border-emerald-200 bg-emerald-50/30 dark:bg-emerald-900/10"
-                    : "border-border/50 opacity-70"
-                }`}
+                      ? "border-emerald-200 bg-emerald-50/30 dark:bg-emerald-900/10"
+                      : "border-border/50 opacity-70"
+                  }`}
               >
                 <CardContent className="p-5">
                   <div className="flex items-center gap-4">
                     <div
-                      className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 ${
-                        isCompleted
+                      className={`h-12 w-12 rounded-xl flex items-center justify-center shrink-0 ${isCompleted
                           ? "bg-emerald-100 text-emerald-600"
                           : isActive
-                          ? "bg-primary/10 text-primary"
-                          : "bg-muted text-muted-foreground/40"
-                      }`}
+                            ? "bg-primary/10 text-primary"
+                            : "bg-muted text-muted-foreground/40"
+                        }`}
                     >
                       {isCompleted ? (
                         <CheckCircle2 className="h-6 w-6" />

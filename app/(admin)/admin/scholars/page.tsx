@@ -23,7 +23,7 @@ import {
 import { Banknote, Briefcase, Flag, TrendingUp } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getDefaultRedirectPath, resolveUserRoleForSession } from "@/lib/auth/roles";
-import { getAdminScholars } from "@/lib/supabase/actions";
+import { getAdminScholarManagementData } from "@/lib/supabase/actions";
 import { redirect } from "next/navigation";
 
 export default async function ScholarManagementPage() {
@@ -39,46 +39,46 @@ export default async function ScholarManagementPage() {
     redirect(getDefaultRedirectPath(role));
   }
 
-  const scholars = await getAdminScholars();
+  const { scholars, metrics, healthPercentages } = await getAdminScholarManagementData();
+
+  const formatCurrency = (amount: number) => {
+    if (amount >= 1e9) return `₦${(amount / 1e9).toFixed(2)}B`;
+    if (amount >= 1e6) return `₦${(amount / 1e6).toFixed(1)}M`;
+    return `₦${amount.toLocaleString()}`;
+  };
 
   const scholarMetrics = [
     {
       title: "Active Scholars",
-      value: scholars.length.toString(),
+      value: metrics.activeScholars.toString(),
       description: "Total scholars in system",
       icon: TrendingUp,
     },
     {
       title: "Milestones Due",
-      value: "0", // Placeholder for dynamic calc
+      value: metrics.milestonesDue.toString(),
       description: "Need evidence or owner follow-up",
       icon: Flag,
     },
     {
       title: "Placement Watchlist",
-      value: "0", // Placeholder
+      value: metrics.placementWatchlist.toString(),
       description: "Require partner intervention",
       icon: Briefcase,
     },
     {
       title: "Funding Watchlist",
-      value: "0", // Placeholder
+      value: metrics.fundingWatchlist.toString(),
       description: "Accounts needing disbursement review",
       icon: Banknote,
     },
   ];
 
-  const scholarHealthBreakdown = [
-    { label: "On Track", value: 85, color: "var(--primary)" },
-    { label: "At Risk", value: 10, color: "#f59e0b" },
-    { label: "Off Track", value: 5, color: "#ef4444" },
-  ];
-
   const scholarManagementFocus = [
     { title: "Academic Progression", description: "Monitoring credits and CGPA for all active cohorts.", metric: "8 cohort-cycles active" },
-    { title: "Industry Placements", description: "Coordinating with partners for summer and final-year internships.", metric: "112 matches pending" },
-    { title: "Funding Health", description: "Reviewing stipend disbursement and tuition commitments.", metric: "NGN 4.2M disbursed" },
-    { title: "Impact Verification", description: "Checking evidence for service and public value milestones.", metric: "14 unverified entries" },
+    { title: "Industry Placements", description: "Coordinating with partners for summer and final-year internships.", metric: "Matches pending tracking" },
+    { title: "Funding Health", description: "Reviewing stipend disbursement and tuition commitments.", metric: `${formatCurrency(metrics.totalDisbursed)} disbursed` },
+    { title: "Impact Verification", description: "Checking evidence for service and public value milestones.", metric: `${metrics.milestonesDue} unverified entries` },
   ];
 
   return (
@@ -134,7 +134,7 @@ export default async function ScholarManagementPage() {
             </CardHeader>
             <CardContent>
               <HorizontalBarChart
-                items={scholarHealthBreakdown}
+                items={healthPercentages}
                 valueSuffix="%"
               />
             </CardContent>

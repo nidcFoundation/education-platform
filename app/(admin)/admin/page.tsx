@@ -28,6 +28,9 @@ import {
 } from "lucide-react";
 import { getAdminDashboardData } from "@/lib/supabase/actions";
 import { adminFundingDistribution, adminSectionLinks } from "@/lib/constants";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { resolveUserRoleForSession } from "@/lib/auth/roles";
+import { redirect } from "next/navigation";
 
 const dashboardIcons = [
     Users,
@@ -39,7 +42,27 @@ const dashboardIcons = [
 ];
 
 export default async function AdminDashboardPage() {
-    const { counts, totalFunding, applications, cohorts, programs } = await getAdminDashboardData();
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        redirect("/login");
+    }
+
+    const role = await resolveUserRoleForSession(supabase, user);
+    if (role !== "admin" && role !== "reviewer") {
+        redirect("/dashboard"); // Redirect to their safe dashboard
+    }
+
+    const {
+        counts,
+        applicationCounts,
+        averageReviewCompletion,
+        totalFunding,
+        applications,
+        cohorts,
+        programs,
+    } = await getAdminDashboardData();
 
     const totalCohortPopulation = cohorts.reduce((sum: number, cohort: any) => sum + (cohort.active_scholars_count || 0), 0);
 
@@ -51,11 +74,11 @@ export default async function AdminDashboardPage() {
 
     const adminDashboardMetrics = [
         { title: "Active Scholars", value: counts.scholars.toLocaleString(), description: "Currently enrolled", trend: { value: 12, isPositive: true } },
-        { title: "Review Queue", value: counts.applicants.toLocaleString(), description: "Applications pending", trend: { value: 5, isPositive: false } },
-        { title: "Cohort Health", value: "94%", description: "Average progress score", trend: { value: 2, isPositive: true } },
+        { title: "Review Queue", value: (applicationCounts.reviewQueue || 0).toLocaleString(), description: "Submitted/Under-review applications", trend: { value: 0, isPositive: true } },
+        { title: "Cohort Completion", value: `${averageReviewCompletion}%`, description: "Average across tracked cohorts", trend: { value: 0, isPositive: true } },
         { title: "Active Programs", value: programs.length.toString(), description: "Deployment tracks", trend: { value: 0, isPositive: true } },
-        { title: "Funding Deployed", value: formatCurrency(totalFunding), description: "Total committed value", trend: { value: 8, isPositive: true } },
-        { title: "National Impact", value: "1.2k", description: "Beneficiaries reached", trend: { value: 15, isPositive: true } },
+        { title: "Funding Committed", value: formatCurrency(totalFunding), description: "Tracked donor commitments", trend: { value: 0, isPositive: true } },
+        { title: "Total Applications", value: (applicationCounts.total || 0).toLocaleString(), description: "Incoming and active records", trend: { value: 0, isPositive: true } },
     ];
 
     const adminCohortDistribution = cohorts.map((c: any) => ({
@@ -94,7 +117,7 @@ export default async function AdminDashboardPage() {
                                             Operations healthy
                                         </span>
                                         <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold">
-                                            {cohorts[0]?.year || "2026"} intake cycle
+                                            {(cohorts[0] as any)?.year || "2026"} intake cycle
                                         </span>
                                     </div>
                                     <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
@@ -133,7 +156,7 @@ export default async function AdminDashboardPage() {
                                 </div>
                                 <div className="mt-4 space-y-4">
                                     {[
-                                        { label: "Review queue", value: counts.applicants.toLocaleString(), detail: "Applications pending internal reviewer action" },
+                                         { label: "Review queue", value: (applicationCounts.reviewQueue || 0).toLocaleString(), detail: "Applications pending internal reviewer action" },
                                         { label: "Active scholars", value: counts.scholars.toLocaleString(), detail: "Scholars currently tracked across all programs" },
                                         { label: "Live cohorts", value: cohorts.length.toString(), detail: "Scholar intake windows currently being managed" },
                                     ].map((item) => (

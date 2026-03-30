@@ -43,6 +43,7 @@ type ReviewProfile = {
 
 type ReviewApplication = {
   program_id?: string | null;
+  program_name?: string | null;
   academic_background?: Partial<AcademicBackground> | null;
   essays?: Partial<EssaySubmission> | null;
 };
@@ -209,7 +210,7 @@ export function ApplicationReview({
         <div className="space-y-3">
           <InfoRow
             label="Preferred Programme"
-            value={toOptionalString(application?.program_id)}
+            value={toOptionalString(application?.program_name)}
           />
           <Separator />
           <InfoRow label="Secondary School" value={ab.secondarySchool} />
@@ -291,13 +292,12 @@ export function ApplicationReview({
                 <span className="text-sm flex-1 truncate">{doc.name}</span>
                 <Badge
                   variant="outline"
-                  className={`text-[10px] capitalize shrink-0 ${
-                    doc.status === "verified"
+                  className={`text-[10px] capitalize shrink-0 ${doc.status === "verified"
                       ? "border-emerald-300 text-emerald-700 bg-emerald-50"
                       : doc.status === "pending"
-                      ? "border-amber-300 text-amber-700 bg-amber-50"
-                      : "border-red-300 text-red-700 bg-red-50"
-                  }`}
+                        ? "border-amber-300 text-amber-700 bg-amber-50"
+                        : "border-red-300 text-red-700 bg-red-50"
+                    }`}
                 >
                   {doc.status}
                 </Badge>

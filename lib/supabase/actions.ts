@@ -1,5 +1,7 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createSupabaseAdminClient } from "./admin";
 import { createSupabaseServerClient } from "./server";
 import {
     Scholar,
@@ -14,6 +16,8 @@ import {
 } from "@/types";
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
+type ServerSupabaseClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+type PublicSupabaseClient = SupabaseClient<any, "public", any>;
 
 function getProgramName(program: unknown): string {
     if (!program || typeof program !== "object") return "";
@@ -146,16 +150,138 @@ function isMissingRelationshipError(error: unknown, fromTable: string, toTable: 
     );
 }
 
+function isTablePermissionError(error: unknown, table: string): boolean {
+    if (!error || typeof error !== "object") {
+        return false;
+    }
+
+    const source = error as Record<string, unknown>;
+    const message = typeof source.message === "string"
+        ? source.message.toLocaleLowerCase()
+        : "";
+
+    return source.code === "42501" && message.includes(`permission denied for table ${table.toLocaleLowerCase()}`);
+}
+
+async function runWithTablePermissionFallback<T>(
+    supabase: ServerSupabaseClient,
+    table: string,
+    query: (client: PublicSupabaseClient) => Promise<{ data: T; error: unknown }>
+): Promise<{ data: T; error: unknown }> {
+    const primaryResult = await query(supabase);
+
+    if (!isTablePermissionError(primaryResult.error, table)) {
+        return primaryResult;
+    }
+
+    return await query(createSupabaseAdminClient());
+}
+
+async function getCohortYearMap(
+    supabase: ServerSupabaseClient,
+    cohortIds: Array<string | null | undefined>
+): Promise<Map<string, string | number | null>> {
+    const uniqueCohortIds = Array.from(
+        new Set(
+            cohortIds
+                .map((cohortId) => getTrimmedString(cohortId))
+                .filter((cohortId): cohortId is string => Boolean(cohortId))
+        )
+    );
+
+    if (uniqueCohortIds.length === 0) {
+        return new Map();
+    }
+
+    const { data, error } = await runWithTablePermissionFallback(
+        supabase,
+        "cohorts",
+        (client) =>
+            client
+                .from("cohorts")
+                .select("id, year")
+                .in("id", uniqueCohortIds)
+    );
+
+    if (error) {
+        console.error("Error fetching cohort years:", formatSupabaseError(error));
+        return new Map();
+    }
+
+    return new Map(
+        (data || []).flatMap((row) => {
+            if (!row || typeof row !== "object") {
+                return [];
+            }
+
+            const source = row as Record<string, unknown>;
+            const id = getTrimmedString(source.id);
+            if (!id) {
+                return [];
+            }
+
+            return [[id, getCohortYear(source)]];
+        })
+    );
+}
+
+async function hydrateRowsWithCohortYears<T>(
+    supabase: ServerSupabaseClient,
+    rows: T[] | null | undefined
+): Promise<T[]> {
+    const cohortYearMap = await getCohortYearMap(
+        supabase,
+        (rows || []).flatMap((row) => {
+            if (!row || typeof row !== "object") {
+                return [];
+            }
+
+            const source = row as Record<string, unknown>;
+            const hasCohortYear = source.cohort_year !== undefined && source.cohort_year !== null;
+            const cohortId = getTrimmedString(source.cohort_id);
+
+            return !hasCohortYear && cohortId ? [cohortId] : [];
+        })
+    );
+
+    if (cohortYearMap.size === 0) {
+        return rows || [];
+    }
+
+    return (rows || []).map((row) => {
+        if (!row || typeof row !== "object") {
+            return row;
+        }
+
+        const source = row as Record<string, unknown>;
+        const cohortId = getTrimmedString(source.cohort_id);
+
+        if (!cohortId || !cohortYearMap.has(cohortId)) {
+            return row;
+        }
+
+        return {
+            ...source,
+            cohort_year: cohortYearMap.get(cohortId) ?? null,
+        } as T;
+    });
+}
+
 async function getAdminCohortsData(
-    supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>
+    supabase: ServerSupabaseClient
 ) {
-    const cohortsWithProgramsRes = await supabase
-        .from("cohorts")
-        .select(`
+    const cohortsWithProgramsRes = await runWithTablePermissionFallback(
+        supabase,
+        "cohorts",
+        (client) =>
+            client
+                .from("cohorts")
+                .select(`
       *,
       programs (*)
     `)
-        .order("year", { ascending: false });
+                .order("year", { ascending: false })
+    );
 
     if (!cohortsWithProgramsRes.error) {
         return normalizeCohortsList(cohortsWithProgramsRes.data);
@@ -169,10 +295,15 @@ async function getAdminCohortsData(
         return [];
     }
 
-    const fallbackCohortsRes = await supabase
-        .from("cohorts")
-        .select("*")
-        .order("year", { ascending: false });
+    const fallbackCohortsRes = await runWithTablePermissionFallback(
+        supabase,
+        "cohorts",
+        (client) =>
+            client
+                .from("cohorts")
+                .select("*")
+                .order("year", { ascending: false })
+    );
 
     if (fallbackCohortsRes.error) {
         console.error(
@@ -217,10 +348,13 @@ function normalizeAdminApplicationRecord<T>(application: T): T {
     }
 
     const source = application as Record<string, unknown>;
+    const programChoice = (source.programChoice || source.program_choice || getProgramChoiceFromAcademicBackground(source.academic_background)) as string | null;
     const normalizedPrograms =
         source.programs && typeof source.programs === "object"
             ? normalizeProgramRecord(source.programs)
-            : source.programs;
+            : programChoice
+                ? { name: programChoice }
+                : source.programs;
     const normalizedDocuments = normalizeApplicationDocuments(source.documents);
     const normalizedScore =
         typeof source.score === "number" && Number.isFinite(source.score)
@@ -235,7 +369,303 @@ function normalizeAdminApplicationRecord<T>(application: T): T {
         documents: normalizedDocuments,
         score: normalizedScore,
         cohort_year: normalizedCohortYear,
+        program_name: getProgramName(normalizedPrograms) || programChoice,
     } as T;
+}
+
+const REVIEW_QUEUE_STATUSES = new Set<ApplicationStatus>([
+    "submitted",
+    "under_review",
+    "shortlisted",
+    "interview_stage",
+]);
+
+const SUBMITTED_APPLICATION_STATUSES = new Set<ApplicationStatus>([
+    "submitted",
+    "under_review",
+    "shortlisted",
+    "interview_stage",
+    "accepted",
+    "rejected",
+]);
+
+const REVIEW_COMPLETED_STATUSES = new Set<ApplicationStatus>([
+    "shortlisted",
+    "interview_stage",
+    "accepted",
+    "rejected",
+]);
+
+const ACCEPTED_APPLICATION_STATUSES = new Set<ApplicationStatus>(["accepted"]);
+
+function getProgramChoiceFromAcademicBackground(value: unknown): string | null {
+    if (!value || typeof value !== "object") {
+        return null;
+    }
+
+    const source = value as Record<string, unknown>;
+    return getTrimmedString(source.programChoice);
+}
+
+function normalizeComparisonText(value: unknown): string {
+    return (getTrimmedString(value) || "")
+        .toLocaleLowerCase()
+        .replace(/\s+/g, " ");
+}
+
+function getApplicationStatusValue(value: unknown): ApplicationStatus | null {
+    if (typeof value !== "string") {
+        return null;
+    }
+
+    const normalizedStatus = value.trim() as ApplicationStatus;
+    return normalizedStatus ? normalizedStatus : null;
+}
+
+function isSubmittedApplicationStatus(value: unknown): boolean {
+    const status = getApplicationStatusValue(value);
+    return status ? SUBMITTED_APPLICATION_STATUSES.has(status) : false;
+}
+
+function isReviewQueueApplicationStatus(value: unknown): boolean {
+    const status = getApplicationStatusValue(value);
+    return status ? REVIEW_QUEUE_STATUSES.has(status) : false;
+}
+
+function isReviewCompletedApplicationStatus(value: unknown): boolean {
+    const status = getApplicationStatusValue(value);
+    return status ? REVIEW_COMPLETED_STATUSES.has(status) : false;
+}
+
+function isAcceptedApplicationStatus(value: unknown): boolean {
+    const status = getApplicationStatusValue(value);
+    return status ? ACCEPTED_APPLICATION_STATUSES.has(status) : false;
+}
+
+async function resolveProgramAndCohortSelection(
+    supabase: ServerSupabaseClient,
+    programChoiceValue: unknown
+): Promise<{ programId: string | null; cohortId: string | null; programName: string | null }> {
+    const desiredProgramName = getTrimmedString(programChoiceValue);
+    if (!desiredProgramName) {
+        return {
+            programId: null,
+            cohortId: null,
+            programName: null,
+        };
+    }
+
+    const { data: programs, error: programsError } = await supabase
+        .from("programs")
+        .select("*");
+
+    if (programsError) {
+        console.error(
+            "Error resolving program selection:",
+            formatSupabaseError(programsError)
+        );
+        return {
+            programId: null,
+            cohortId: null,
+            programName: desiredProgramName,
+        };
+    }
+
+    const matchedProgram = sortProgramsByName(normalizeProgramsList(programs)).find((program) =>
+        normalizeComparisonText(getProgramName(program)) === normalizeComparisonText(desiredProgramName)
+    );
+
+    if (!matchedProgram || typeof (matchedProgram as Record<string, unknown>).id !== "string") {
+        return {
+            programId: null,
+            cohortId: null,
+            programName: desiredProgramName,
+        };
+    }
+
+    const programId = ((matchedProgram as Record<string, unknown>).id as string).trim();
+    const { data: latestCohort, error: cohortError } = await runWithTablePermissionFallback(
+        supabase,
+        "cohorts",
+        (client) =>
+            client
+                .from("cohorts")
+                .select("id")
+                .eq("program_id", programId)
+                .order("year", { ascending: false })
+                .limit(1)
+                .maybeSingle()
+    );
+
+    if (cohortError) {
+        console.error(
+            "Error resolving cohort selection:",
+            formatSupabaseError(cohortError)
+        );
+    }
+
+    return {
+        programId,
+        cohortId: typeof latestCohort?.id === "string" ? latestCohort.id : null,
+        programName: getProgramName(matchedProgram) || desiredProgramName,
+    };
+}
+
+function mergeAdminCohortsWithApplicationRollups<T>(
+    cohorts: T[] | null | undefined,
+    applications: Array<Record<string, unknown>>
+): T[] {
+    const normalizedCohorts = normalizeCohortsList(cohorts);
+    const directApplicationsByCohortId = new Map<string, Array<Record<string, unknown>>>();
+    const unassignedApplicationsByProgramId = new Map<string, Array<Record<string, unknown>>>();
+    const cohortCountByProgramId = new Map<string, number>();
+
+    normalizedCohorts.forEach((cohort) => {
+        if (!cohort || typeof cohort !== "object") {
+            return;
+        }
+
+        const source = cohort as Record<string, unknown>;
+        const programId = getTrimmedString(source.program_id);
+        if (!programId) {
+            return;
+        }
+
+        cohortCountByProgramId.set(programId, (cohortCountByProgramId.get(programId) || 0) + 1);
+    });
+
+    applications.forEach((application) => {
+        const cohortId = getTrimmedString(application.cohort_id);
+        const programId = getTrimmedString(application.program_id);
+
+        if (cohortId) {
+            const existing = directApplicationsByCohortId.get(cohortId) || [];
+            existing.push(application);
+            directApplicationsByCohortId.set(cohortId, existing);
+            return;
+        }
+
+        if (programId) {
+            const existing = unassignedApplicationsByProgramId.get(programId) || [];
+            existing.push(application);
+            unassignedApplicationsByProgramId.set(programId, existing);
+        }
+    });
+
+    return normalizedCohorts.map((cohort) => {
+        if (!cohort || typeof cohort !== "object") {
+            return cohort;
+        }
+
+        const source = cohort as Record<string, unknown>;
+        const cohortId = getTrimmedString(source.id);
+        const programId = getTrimmedString(source.program_id);
+        const directlyAssignedApplications = cohortId
+            ? directApplicationsByCohortId.get(cohortId) || []
+            : [];
+        const legacyProgramAssignedApplications =
+            programId && cohortCountByProgramId.get(programId) === 1
+                ? unassignedApplicationsByProgramId.get(programId) || []
+                : [];
+        const combinedApplications = Array.from(
+            new Map(
+                [...directlyAssignedApplications, ...legacyProgramAssignedApplications]
+                    .map((application) => [getTrimmedString(application.id) || crypto.randomUUID(), application])
+            ).values()
+        );
+        const hasMappedApplications = combinedApplications.length > 0;
+        const derivedApplicantsCount = combinedApplications.filter((application) =>
+            isSubmittedApplicationStatus(application.status)
+        ).length;
+        const derivedActiveScholarsCount = combinedApplications.filter((application) =>
+            isAcceptedApplicationStatus(application.status)
+        ).length;
+        const derivedReviewCompletion =
+            derivedApplicantsCount > 0
+                ? Math.round(
+                    (combinedApplications.filter((application) =>
+                        isReviewCompletedApplicationStatus(application.status)
+                    ).length / derivedApplicantsCount) * 100
+                )
+                : 0;
+        const derivedReadinessStatus =
+            derivedActiveScholarsCount > 0
+                ? "live"
+                : combinedApplications.some((application) =>
+                    isReviewQueueApplicationStatus(application.status)
+                )
+                    ? "review"
+                    : "planned";
+
+        return normalizeCohortRecord({
+            ...source,
+            applicants_count: hasMappedApplications
+                ? derivedApplicantsCount
+                : getNumericValue(source.applicants_count) ?? 0,
+            active_scholars_count: hasMappedApplications
+                ? derivedActiveScholarsCount
+                : getNumericValue(source.active_scholars_count) ?? 0,
+            review_completion_percentage: hasMappedApplications
+                ? derivedReviewCompletion
+                : getNumericValue(source.review_completion_percentage) ??
+                getNumericValue(source.review_completion) ??
+                0,
+            readiness_status:
+                getTrimmedString(source.readiness_status) ??
+                getTrimmedString(source.readiness) ??
+                (hasMappedApplications ? derivedReadinessStatus : "planned"),
+        }) as T;
+    });
+}
+
+async function fetchAdminApplicationsData(
+    supabase: ServerSupabaseClient
+) {
+    const { data, error } = await supabase
+        .from("applications")
+        .select(`
+      *,
+      profiles (first_name, last_name, email),
+      cohorts (year),
+      programs (*)
+    `)
+        .order("created_at", { ascending: false });
+
+    if (!error) {
+        return (data || []).map((application) => normalizeAdminApplicationRecord(application));
+    }
+
+    const canRetryWithoutCohortsRelation =
+        isTablePermissionError(error, "cohorts") ||
+        isMissingRelationshipError(error, "applications", "cohorts");
+
+    if (!canRetryWithoutCohortsRelation) {
+        console.error(
+            "Error fetching admin applications:",
+            formatSupabaseError(error)
+        );
+        return [];
+    }
+
+    const fallbackRes = await supabase
+        .from("applications")
+        .select(`
+      *,
+      profiles (first_name, last_name, email),
+      programs (*)
+    `)
+        .order("created_at", { ascending: false });
+
+    if (fallbackRes.error) {
+        console.error(
+            "Error fetching admin applications:",
+            formatSupabaseError(fallbackRes.error)
+        );
+        return [];
+    }
+
+    const hydratedApplications = await hydrateRowsWithCohortYears(supabase, fallbackRes.data);
+    return hydratedApplications.map((application) => normalizeAdminApplicationRecord(application));
 }
 
 function sortProgramsByName<T>(programs: T[]): T[] {
@@ -461,25 +891,37 @@ export async function getAdminDashboardData() {
 
     const [
         scholarsCount,
-        applicantsCount,
         donorsCount,
-        applicationsRes,
-        cohorts,
+        applications,
+        baseCohorts,
         programsRes,
         fundingRes
     ] = await Promise.all([
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "scholar"),
-        supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "applicant"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "donor"),
-        supabase.from("applications").select("*, profiles(first_name, last_name, email)").order("created_at", { ascending: false }).limit(10),
+        fetchAdminApplicationsData(supabase),
         getAdminCohortsData(supabase),
         supabase.from("programs").select("*"),
         supabase.from("donor_details").select("commitment")
     ]);
 
+    const nonDraftApplications = applications.filter((application) =>
+        application.status !== "draft"
+    );
+    const reviewQueueApplications = nonDraftApplications.filter((application) =>
+        isReviewQueueApplicationStatus(application.status)
+    );
+    const cohorts = mergeAdminCohortsWithApplicationRollups(baseCohorts, applications);
+    const averageReviewCompletion = cohorts.length > 0
+        ? Math.round(
+            cohorts.reduce((sum: number, cohort: Record<string, unknown>) =>
+                sum + (getNumericValue(cohort.review_completion_percentage) || 0), 0
+            ) / cohorts.length
+        )
+        : 0;
     const counts = {
         scholars: scholarsCount.count || 0,
-        applicants: applicantsCount.count || 0,
+        applicants: nonDraftApplications.length,
         donors: donorsCount.count || 0,
     };
 
@@ -487,8 +929,14 @@ export async function getAdminDashboardData() {
 
     return {
         counts,
+        applicationCounts: {
+            total: applications.length,
+            reviewQueue: reviewQueueApplications.length,
+            drafts: applications.length - nonDraftApplications.length,
+        },
+        averageReviewCompletion,
         totalFunding,
-        applications: applicationsRes.data || [],
+        applications: applications.slice(0, 10), // Show everything recent, including drafts
         cohorts,
         programs: sortProgramsByName(normalizeProgramsList(programsRes.data)),
     };
@@ -604,7 +1052,12 @@ export async function getAdminPrograms() {
 
 export async function getAdminCohorts() {
     const supabase = await createSupabaseServerClient();
-    return getAdminCohortsData(supabase);
+    const [cohorts, applications] = await Promise.all([
+        getAdminCohortsData(supabase),
+        fetchAdminApplicationsData(supabase),
+    ]);
+
+    return mergeAdminCohortsWithApplicationRollups(cohorts, applications);
 }
 
 export async function getAdminFundingLedger() {
@@ -627,28 +1080,22 @@ export async function getAdminFundingLedger() {
 
 export async function getAdminApplications() {
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-        .from("applications")
-        .select(`
-      *,
-      profiles (first_name, last_name, email),
-      cohorts (year),
-      programs (*)
-    `)
-        .order("created_at", { ascending: false });
-
-    if (error) {
-        console.error("Error fetching admin applications:", formatSupabaseError(error));
-        return [];
-    }
-    return (data || []).map((application) => normalizeAdminApplicationRecord(application));
+    return fetchAdminApplicationsData(supabase);
 }
 
 export async function getAdminScholars() {
     const supabase = await createSupabaseServerClient();
     const { data, error } = await supabase
         .from("profiles")
-        .select("*")
+        .select(`
+            *,
+            applications (
+                program_id,
+                cohort_id,
+                programs (title),
+                cohorts (year)
+            )
+        `)
         .eq("role", "scholar")
         .order("created_at", { ascending: false });
 
@@ -656,7 +1103,64 @@ export async function getAdminScholars() {
         console.error("Error fetching admin scholars:", error);
         return [];
     }
-    return data;
+
+    return (data || []).map(profile => {
+        const application = (profile.applications as any[])?.[0];
+        return {
+            ...profile,
+            program: application?.programs?.title,
+            cohort: application?.cohorts?.year,
+            progress_score: (profile as any).progress_score || 0, // Fallback if not in schema
+        };
+    });
+}
+
+export async function getAdminScholarManagementData() {
+    const supabase = await createSupabaseServerClient();
+
+    // Fetch scholars with their primary application info
+    const scholars = await getAdminScholars();
+
+    // Fetch pending milestones for "Milestones Due" count
+    const { count: milestonesDueCount } = await supabase
+        .from("milestones")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending")
+        .lt("due_date", new Date().toISOString());
+
+    // Fetch funding records to calculate total disbursement
+    const { data: fundingRecords } = await supabase
+        .from("funding_records")
+        .select("amount, status")
+        .eq("status", "completed");
+
+    const totalDisbursed = (fundingRecords || []).reduce((sum, record) => sum + (Number(record.amount) || 0), 0);
+
+    // Calculate health breakdown based on progress scores
+    const healthBreakdown = {
+        onTrack: scholars.filter(s => (s as any).progress_score >= 70).length,
+        atRisk: scholars.filter(s => (s as any).progress_score >= 40 && (s as any).progress_score < 70).length,
+        offTrack: scholars.filter(s => (s as any).progress_score < 40).length,
+    };
+
+    const totalScholars = scholars.length || 1;
+    const healthPercentages = [
+        { label: "On Track", value: Math.round((healthBreakdown.onTrack / totalScholars) * 100), color: "var(--primary)" },
+        { label: "At Risk", value: Math.round((healthBreakdown.atRisk / totalScholars) * 100), color: "#f59e0b" },
+        { label: "Off Track", value: Math.round((healthBreakdown.offTrack / totalScholars) * 100), color: "#ef4444" },
+    ];
+
+    return {
+        scholars,
+        metrics: {
+            activeScholars: scholars.length,
+            milestonesDue: milestonesDueCount || 0,
+            placementWatchlist: 0, // Still placeholder until placements table exists
+            fundingWatchlist: 0, // Still placeholder
+            totalDisbursed,
+        },
+        healthPercentages,
+    };
 }
 
 export async function getAdminApplicationById(id: string) {
@@ -672,12 +1176,36 @@ export async function getAdminApplicationById(id: string) {
         .eq("id", id)
         .single();
 
-    if (error) {
+    if (!error) {
+        return data ? normalizeAdminApplicationRecord(data) : null;
+    }
+
+    const canRetryWithoutCohortsRelation =
+        isTablePermissionError(error, "cohorts") ||
+        isMissingRelationshipError(error, "applications", "cohorts");
+
+    if (!canRetryWithoutCohortsRelation) {
         console.error("Error fetching admin application by id:", formatSupabaseError(error));
         return null;
     }
 
-    return data ? normalizeAdminApplicationRecord(data) : null;
+    const fallbackRes = await supabase
+        .from("applications")
+        .select(`
+      *,
+      profiles (first_name, last_name, email, state_of_origin),
+      programs (*)
+    `)
+        .eq("id", id)
+        .single();
+
+    if (fallbackRes.error) {
+        console.error("Error fetching admin application by id:", formatSupabaseError(fallbackRes.error));
+        return null;
+    }
+
+    const [hydratedApplication] = await hydrateRowsWithCohortYears(supabase, [fallbackRes.data]);
+    return hydratedApplication ? normalizeAdminApplicationRecord(hydratedApplication) : null;
 }
 
 export async function getApplicantDashboardData(userId: string) {
@@ -693,7 +1221,7 @@ export async function getApplicantDashboardData(userId: string) {
         supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
         supabase
             .from("applications")
-            .select("*, programs(*)")
+            .select("*, programs(*), cohorts(year)")
             .eq("applicant_id", userId)
             .order("updated_at", { ascending: false })
             .limit(1)
@@ -706,29 +1234,53 @@ export async function getApplicantDashboardData(userId: string) {
     let applicationData = applicationRes.data;
 
     if (applicationRes.error) {
-        // Fallback when relational select fails (for example, missing relationship metadata in some environments).
-        const fallbackApplicationRes = await supabase
+        // Fallback when relational selects fail (for example, missing relationship metadata or a missing cohorts table grant).
+        const fallbackWithProgramsRes = await supabase
             .from("applications")
-            .select("*")
+            .select("*, programs(*)")
             .eq("applicant_id", userId)
             .order("updated_at", { ascending: false })
             .limit(1)
             .maybeSingle();
 
-        if (fallbackApplicationRes.error) {
-            console.error("Error fetching applicant application:", fallbackApplicationRes.error);
+        if (!fallbackWithProgramsRes.error) {
+            const [hydratedApplication] = await hydrateRowsWithCohortYears(supabase, [fallbackWithProgramsRes.data]);
+            applicationData = hydratedApplication || null;
         } else {
-            applicationData = fallbackApplicationRes.data;
+            const fallbackApplicationRes = await supabase
+                .from("applications")
+                .select("*")
+                .eq("applicant_id", userId)
+                .order("updated_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (fallbackApplicationRes.error) {
+                console.error("Error fetching applicant application:", fallbackApplicationRes.error);
+            } else {
+                const [hydratedApplication] = await hydrateRowsWithCohortYears(supabase, [fallbackApplicationRes.data]);
+                applicationData = hydratedApplication || null;
+            }
         }
     }
 
     const documents = normalizeApplicationDocuments(applicationData?.documents);
+    const normalizedProgram =
+        applicationData?.programs && typeof applicationData.programs === "object"
+            ? normalizeProgramRecord(applicationData.programs)
+            : null;
+    const programName =
+        getProgramName(normalizedProgram) ||
+        (applicationData?.programChoice || applicationData?.program_choice || getProgramChoiceFromAcademicBackground(applicationData?.academic_background));
 
     const application = applicationData
         ? {
             ...applicationData,
             step: applicationData.current_step,
             documents,
+            programs: normalizedProgram,
+            program_name: programName,
+            cohort_year: applicationData.cohort_year ?? getCohortYear(applicationData.cohorts),
         }
         : null;
 
@@ -868,7 +1420,7 @@ export async function submitApplication(): Promise<{ error: string | null }> {
 
     const { data: application, error: fetchError } = await supabase
         .from("applications")
-        .select("id, status, current_step")
+        .select("id, status, current_step, academic_background, program_id, cohort_id")
         .eq("applicant_id", user.id)
         .order("updated_at", { ascending: false })
         .limit(1)
@@ -882,7 +1434,15 @@ export async function submitApplication(): Promise<{ error: string | null }> {
         return { error: "No application found to submit." };
     }
 
-    if (application.status === "submitted") {
+    const selection = await resolveProgramAndCohortSelection(
+        supabase,
+        getProgramChoiceFromAcademicBackground(application.academic_background)
+    );
+    const shouldSyncProgramSelection =
+        (selection.programId !== null && selection.programId !== application.program_id) ||
+        (selection.cohortId !== null && selection.cohortId !== application.cohort_id);
+
+    if (application.status === "submitted" && !shouldSyncProgramSelection) {
         return { error: null };
     }
 
@@ -890,10 +1450,16 @@ export async function submitApplication(): Promise<{ error: string | null }> {
     const { error } = await supabase
         .from("applications")
         .update({
-            status: "submitted",
-            current_step: Math.max(application.current_step ?? 1, 5),
-            submitted_at: timestamp,
-            last_saved_at: timestamp,
+            ...(application.status === "submitted"
+                ? {}
+                : {
+                    status: "submitted",
+                    current_step: Math.max(application.current_step ?? 1, 5),
+                    submitted_at: timestamp,
+                    last_saved_at: timestamp,
+                }),
+            ...(selection.programId !== null ? { program_id: selection.programId } : {}),
+            ...(selection.cohortId !== null ? { cohort_id: selection.cohortId } : {}),
         })
         .eq("id", application.id);
 
@@ -1108,6 +1674,16 @@ export async function saveApplicationStep(
         [stepColumn]: stepData,
     };
 
+    if (step === 2) {
+        const programSelection = await resolveProgramAndCohortSelection(
+            supabase,
+            getProgramChoiceFromAcademicBackground(stepData)
+        );
+
+        payload.program_id = programSelection.programId;
+        payload.cohort_id = programSelection.cohortId;
+    }
+
     const writeResult = existingApplication
         ? await supabase.from("applications").update(payload).eq("id", existingApplication.id)
         : await supabase.from("applications").insert(payload);
@@ -1124,7 +1700,8 @@ export async function updateApplicationDecision(
     applicantId: string,
     decision: ApplicationStatus,
     notes: string,
-    scores: Record<string, number>
+    scores: Record<string, number>,
+    cohortId?: string | null
 ): Promise<{ error: string | null }> {
     const supabase = await createSupabaseServerClient();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -1144,18 +1721,24 @@ export async function updateApplicationDecision(
         return { error: "Applicant ID is required." };
     }
 
-    const { error: rpcError } = await supabase.rpc("update_application_decision", {
+    const rpcPayload = {
         p_application_id: sanitizedApplicationId,
         p_applicant_id: sanitizedApplicantId,
         p_decision: decision,
         p_notes: notes,
         p_scores: scores,
-    });
+        p_cohort_id: cohortId || null,
+    };
+    console.log("Calling update_application_decision RPC with:", rpcPayload);
+
+    const { error: rpcError } = await supabase.rpc("update_application_decision", rpcPayload);
 
     if (rpcError) {
+        console.error("RPC Error:", rpcError);
         return { error: rpcError.message };
     }
 
+    console.log("RPC Success for decision:", decision);
     return { error: null };
 }
 
@@ -1252,4 +1835,28 @@ export async function allocateFunding(
     }
 
     return { error: null };
+}
+export async function getAvailableCohorts() {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+        .from("cohorts")
+        .select(`
+            id,
+            year,
+            program_id,
+            programs (title)
+        `)
+        .order("year", { ascending: false });
+
+    if (error) {
+        console.error("Error fetching available cohorts:", formatSupabaseError(error));
+        return [];
+    }
+
+    return (data || []).map(row => ({
+        id: row.id,
+        year: row.year,
+        programId: row.program_id,
+        programName: (row.programs as any)?.title || "Unknown Program"
+    }));
 }

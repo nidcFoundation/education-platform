@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PageContainer } from "@/components/layout/page-container";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getAdminApplications, getAdminApplicationById } from "@/lib/supabase/actions";
+import { getAdminApplications, getAdminApplicationById, getAvailableCohorts } from "@/lib/supabase/actions";
 import { ReviewWorkspace } from "@/components/admin/review-workspace";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -11,8 +11,9 @@ import { resolveUserRoleForSession } from "@/lib/auth/roles";
 export default async function ApplicationReviewPage({
     searchParams,
 }: {
-    searchParams: { id?: string };
+    searchParams: Promise<{ id?: string }>;
 }) {
+    const { id } = await searchParams;
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -26,13 +27,17 @@ export default async function ApplicationReviewPage({
     }
 
     let application = null;
+    const cohorts = await getAvailableCohorts();
 
-    if (searchParams.id) {
-        application = await getAdminApplicationById(searchParams.id);
+    if (id) {
+        application = await getAdminApplicationById(id);
     } else {
         // Fetch the first available application as a fallback for "featured"
         const allApplications = await getAdminApplications();
-        if (allApplications.length > 0) {
+        const prioritizedApplication = allApplications.find((candidate) => candidate.status !== "draft");
+        if (prioritizedApplication) {
+            application = prioritizedApplication;
+        } else if (allApplications.length > 0) {
             application = allApplications[0];
         }
     }
@@ -75,7 +80,7 @@ export default async function ApplicationReviewPage({
                 </Button>
             }
         >
-            <ReviewWorkspace application={application} />
+            <ReviewWorkspace application={application} cohorts={cohorts} />
         </PageContainer>
     );
 }
