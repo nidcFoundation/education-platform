@@ -1092,7 +1092,7 @@ export async function getAdminScholars() {
             applications (
                 program_id,
                 cohort_id,
-                programs (name),
+                programs (title),
                 cohorts (year)
             )
         `)
@@ -1108,7 +1108,7 @@ export async function getAdminScholars() {
         const application = (profile.applications as any[])?.[0];
         return {
             ...profile,
-            program: application?.programs?.name,
+            program: application?.programs?.title,
             cohort: application?.cohorts?.year,
             progress_score: (profile as any).progress_score || 0, // Fallback if not in schema
         };
@@ -1721,19 +1721,24 @@ export async function updateApplicationDecision(
         return { error: "Applicant ID is required." };
     }
 
-    const { error: rpcError } = await supabase.rpc("update_application_decision", {
+    const rpcPayload = {
         p_application_id: sanitizedApplicationId,
         p_applicant_id: sanitizedApplicantId,
         p_decision: decision,
         p_notes: notes,
         p_scores: scores,
         p_cohort_id: cohortId || null,
-    });
+    };
+    console.log("Calling update_application_decision RPC with:", rpcPayload);
+
+    const { error: rpcError } = await supabase.rpc("update_application_decision", rpcPayload);
 
     if (rpcError) {
+        console.error("RPC Error:", rpcError);
         return { error: rpcError.message };
     }
 
+    console.log("RPC Success for decision:", decision);
     return { error: null };
 }
 
@@ -1839,7 +1844,7 @@ export async function getAvailableCohorts() {
             id,
             year,
             program_id,
-            programs (name)
+            programs (title)
         `)
         .order("year", { ascending: false });
 
@@ -1852,6 +1857,6 @@ export async function getAvailableCohorts() {
         id: row.id,
         year: row.year,
         programId: row.program_id,
-        programName: (row.programs as any)?.name || "Unknown Program"
+        programName: (row.programs as any)?.title || "Unknown Program"
     }));
 }

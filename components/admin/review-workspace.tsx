@@ -190,6 +190,15 @@ export function ReviewWorkspace({ application, cohorts }: ReviewWorkspaceProps) 
         setIsSaving(true);
 
         try {
+            console.log("Submitting decision:", {
+                applicationId: application.id,
+                applicantId: application.applicant_id,
+                decision: nextDecision,
+                notes,
+                scores,
+                selectedCohortId
+            });
+
             const { error } = await updateApplicationDecision(
                 application.id,
                 application.applicant_id,
@@ -199,7 +208,10 @@ export function ReviewWorkspace({ application, cohorts }: ReviewWorkspaceProps) 
                 selectedCohortId
             );
 
+            console.log("Server response:", { error });
+
             if (error) {
+                console.error("Action error:", error);
                 setRequestedDecision(null);
                 setFeedback(`Error: ${error}`);
                 return;
@@ -207,8 +219,15 @@ export function ReviewWorkspace({ application, cohorts }: ReviewWorkspaceProps) 
 
             setDecision(nextDecision);
             setFeedback(message);
+
+            // If accepted, we might want to navigate back or show a "Done" state
+            if (nextDecision === "accepted") {
+                setFeedback("Decision finalized. The applicant is now an approved scholar.");
+            }
+
             router.refresh();
         } catch (error: unknown) {
+            console.error("Caught exception:", error);
             const message = error instanceof Error ? error.message : "An unexpected error occurred.";
             setFeedback(`Error: ${message}`);
         } finally {
@@ -349,9 +368,21 @@ export function ReviewWorkspace({ application, cohorts }: ReviewWorkspaceProps) 
                                 {isSaving && requestedDecision === "shortlisted" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Shortlist
                             </Button>
-                            <Button disabled={isSaving} type="button" variant="outline" onClick={() => handleDecision("accepted", "Candidate marked approved.")}>
+                            <Button
+                                disabled={isSaving}
+                                type="button"
+                                variant={decision === "shortlisted" || decision === "interview_stage" ? "default" : "outline"}
+                                className={decision === "shortlisted" || decision === "interview_stage" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}
+                                onClick={() => {
+                                    if (!selectedCohortId) {
+                                        setFeedback("Error: Please assign a cohort before approving the scholar.");
+                                        return;
+                                    }
+                                    handleDecision("accepted", "Candidate marked approved. Role updated to scholar.");
+                                }}
+                            >
                                 {isSaving && requestedDecision === "accepted" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Approve
+                                Approve Scholar
                             </Button>
                             <Button disabled={isSaving} type="button" variant="destructive" onClick={() => handleDecision("rejected", "Candidate marked rejected.")}>
                                 {isSaving && requestedDecision === "rejected" && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
