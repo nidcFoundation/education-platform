@@ -65,6 +65,179 @@ function normalizeProgramsRelation<T>(rows: T[] | null | undefined): T[] {
     });
 }
 
+function getNumericValue(value: unknown): number | null {
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+    }
+
+    if (typeof value === "string") {
+        const trimmedValue = value.trim();
+        if (!trimmedValue) {
+            return null;
+        }
+
+        const parsedValue = Number(trimmedValue);
+        return Number.isFinite(parsedValue) ? parsedValue : null;
+    }
+
+    return null;
+}
+
+function getTrimmedString(value: unknown): string | null {
+    if (typeof value !== "string") {
+        return null;
+    }
+
+    const trimmedValue = value.trim();
+    return trimmedValue ? trimmedValue : null;
+}
+
+function normalizeCohortRecord<T>(cohort: T): T {
+    if (!cohort || typeof cohort !== "object") {
+        return cohort;
+    }
+
+    const source = cohort as Record<string, unknown>;
+    const normalizedPrograms =
+        source.programs && typeof source.programs === "object"
+            ? normalizeProgramRecord(source.programs)
+            : null;
+    const reviewCompletionPercentage =
+        getNumericValue(source.review_completion_percentage) ??
+        getNumericValue(source.review_completion) ??
+        0;
+    const fundingReleased =
+        getNumericValue(source.funding_released) ??
+        0;
+    const readinessStatus =
+        getTrimmedString(source.readiness_status) ??
+        getTrimmedString(source.readiness) ??
+        "planned";
+
+    return {
+        ...source,
+        programs: normalizedPrograms,
+        review_completion_percentage: reviewCompletionPercentage,
+        funding_released: fundingReleased,
+        readiness_status: readinessStatus,
+    } as T;
+}
+
+function normalizeCohortsList<T>(rows: T[] | null | undefined): T[] {
+    return (rows || []).map((row) => normalizeCohortRecord(row));
+}
+
+function isMissingRelationshipError(error: unknown, fromTable: string, toTable: string): boolean {
+    if (!error || typeof error !== "object") {
+        return false;
+    }
+
+    const source = error as Record<string, unknown>;
+    const message = typeof source.message === "string" ? source.message : "";
+    const details = typeof source.details === "string" ? source.details : "";
+
+    if (source.code !== "PGRST200") {
+        return false;
+    }
+
+    return (
+        (message.includes(`'${fromTable}'`) && message.includes(`'${toTable}'`)) ||
+        (details.includes(`'${fromTable}'`) && details.includes(`'${toTable}'`))
+    );
+}
+
+async function getAdminCohortsData(
+    supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>
+) {
+    const cohortsWithProgramsRes = await supabase
+        .from("cohorts")
+        .select(`
+      *,
+      programs (*)
+    `)
+        .order("year", { ascending: false });
+
+    if (!cohortsWithProgramsRes.error) {
+        return normalizeCohortsList(cohortsWithProgramsRes.data);
+    }
+
+    if (!isMissingRelationshipError(cohortsWithProgramsRes.error, "cohorts", "programs")) {
+        console.error(
+            "Error fetching admin cohorts:",
+            formatSupabaseError(cohortsWithProgramsRes.error)
+        );
+        return [];
+    }
+
+    const fallbackCohortsRes = await supabase
+        .from("cohorts")
+        .select("*")
+        .order("year", { ascending: false });
+
+    if (fallbackCohortsRes.error) {
+        console.error(
+            "Error fetching admin cohorts:",
+            formatSupabaseError(fallbackCohortsRes.error)
+        );
+        return [];
+    }
+
+    return normalizeCohortsList(fallbackCohortsRes.data);
+}
+
+function getCohortYear(cohort: unknown): string | number | null {
+    if (!cohort || typeof cohort !== "object") return null;
+
+    const source = cohort as Record<string, unknown>;
+    if (typeof source.year === "number" || typeof source.year === "string") {
+        return source.year;
+    }
+
+    return null;
+}
+
+function getReviewScoreTotal(reviewScores: unknown): number | null {
+    if (!reviewScores || typeof reviewScores !== "object") {
+        return null;
+    }
+
+    const scores = Object.values(reviewScores as Record<string, unknown>)
+        .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+
+    if (scores.length === 0) {
+        return null;
+    }
+
+    return scores.reduce((sum, value) => sum + value, 0);
+}
+
+function normalizeAdminApplicationRecord<T>(application: T): T {
+    if (!application || typeof application !== "object") {
+        return application;
+    }
+
+    const source = application as Record<string, unknown>;
+    const normalizedPrograms =
+        source.programs && typeof source.programs === "object"
+            ? normalizeProgramRecord(source.programs)
+            : source.programs;
+    const normalizedDocuments = normalizeApplicationDocuments(source.documents);
+    const normalizedScore =
+        typeof source.score === "number" && Number.isFinite(source.score)
+            ? source.score
+            : getReviewScoreTotal(source.review_scores);
+    const normalizedCohortYear =
+        source.cohort_year ?? getCohortYear(source.cohorts);
+
+    return {
+        ...source,
+        programs: normalizedPrograms,
+        documents: normalizedDocuments,
+        score: normalizedScore,
+        cohort_year: normalizedCohortYear,
+    } as T;
+}
+
 function sortProgramsByName<T>(programs: T[]): T[] {
     return [...programs].sort((a, b) =>
         getProgramName(a).localeCompare(getProgramName(b), undefined, { sensitivity: "base" })
@@ -291,7 +464,7 @@ export async function getAdminDashboardData() {
         applicantsCount,
         donorsCount,
         applicationsRes,
-        cohortsRes,
+        cohorts,
         programsRes,
         fundingRes
     ] = await Promise.all([
@@ -299,7 +472,7 @@ export async function getAdminDashboardData() {
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "applicant"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "donor"),
         supabase.from("applications").select("*, profiles(first_name, last_name, email)").order("created_at", { ascending: false }).limit(10),
-        supabase.from("cohorts").select("*, programs(*)").order("year", { ascending: false }),
+        getAdminCohortsData(supabase),
         supabase.from("programs").select("*"),
         supabase.from("donor_details").select("commitment")
     ]);
@@ -316,7 +489,7 @@ export async function getAdminDashboardData() {
         counts,
         totalFunding,
         applications: applicationsRes.data || [],
-        cohorts: normalizeProgramsRelation(cohortsRes.data),
+        cohorts,
         programs: sortProgramsByName(normalizeProgramsList(programsRes.data)),
     };
 }
@@ -431,19 +604,7 @@ export async function getAdminPrograms() {
 
 export async function getAdminCohorts() {
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-        .from("cohorts")
-        .select(`
-      *,
-      programs (*)
-    `)
-        .order("year", { ascending: false });
-
-    if (error) {
-        console.error("Error fetching admin cohorts:", formatSupabaseError(error));
-        return [];
-    }
-    return normalizeProgramsRelation(data);
+    return getAdminCohortsData(supabase);
 }
 
 export async function getAdminFundingLedger() {
@@ -470,15 +631,17 @@ export async function getAdminApplications() {
         .from("applications")
         .select(`
       *,
-      profiles (first_name, last_name, email)
+      profiles (first_name, last_name, email),
+      cohorts (year),
+      programs (*)
     `)
         .order("created_at", { ascending: false });
 
     if (error) {
-        console.error("Error fetching admin applications:", error);
+        console.error("Error fetching admin applications:", formatSupabaseError(error));
         return [];
     }
-    return data;
+    return (data || []).map((application) => normalizeAdminApplicationRecord(application));
 }
 
 export async function getAdminScholars() {
@@ -502,22 +665,19 @@ export async function getAdminApplicationById(id: string) {
         .from("applications")
         .select(`
       *,
-      profiles (first_name, last_name, email, state_of_origin)
+      profiles (first_name, last_name, email, state_of_origin),
+      cohorts (year),
+      programs (*)
     `)
         .eq("id", id)
         .single();
 
     if (error) {
-        console.error("Error fetching admin application by id:", error);
+        console.error("Error fetching admin application by id:", formatSupabaseError(error));
         return null;
     }
 
-    return data
-        ? {
-            ...data,
-            documents: normalizeApplicationDocuments(data.documents),
-        }
-        : null;
+    return data ? normalizeAdminApplicationRecord(data) : null;
 }
 
 export async function getApplicantDashboardData(userId: string) {

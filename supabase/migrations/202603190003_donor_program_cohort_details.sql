@@ -28,7 +28,7 @@ alter table public.programs add column if not exists placement_rate numeric(5, 2
 -- Formalizing cohort management.
 create table if not exists public.cohorts (
     id uuid primary key default gen_random_uuid(),
-    program_id uuid references public.programs (id) on delete cascade,
+    program_id uuid references public.programs (id) on delete set null,
     year integer not null,
     phase text, -- e.g., 'In-programme', 'Selection and onboarding'
     applicants_count integer default 0,

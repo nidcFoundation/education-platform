@@ -6,6 +6,7 @@ import { getAdminApplications, getAdminApplicationById } from "@/lib/supabase/ac
 import { ReviewWorkspace } from "@/components/admin/review-workspace";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { resolveUserRoleForSession } from "@/lib/auth/roles";
 
 export default async function ApplicationReviewPage({
     searchParams,
@@ -17,6 +18,11 @@ export default async function ApplicationReviewPage({
 
     if (!user) {
         redirect("/login");
+    }
+
+    const role = await resolveUserRoleForSession(supabase, user);
+    if (role !== "admin" && role !== "reviewer") {
+        redirect("/admin");
     }
 
     let application = null;
