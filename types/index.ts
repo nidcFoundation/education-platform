@@ -22,6 +22,21 @@ export type DocumentType =
     | "award_letter"
     | "other";
 
+
+export type AdminCohort = {
+        id: string;
+        year: number | string;
+        phase?: string;
+        applicants_count: number;
+        active_scholars_count: number;
+        review_completion_percentage: number;
+        funding_released: number;
+        readiness_status: string;
+        programs?: {
+            name: string;
+        };
+    };
+
 export interface User {
     id: string;
     name: string;
