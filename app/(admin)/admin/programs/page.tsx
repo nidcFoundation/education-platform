@@ -16,6 +16,7 @@ import { BadgeCheck, BookOpen, GraduationCap, Wallet } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getAdminPrograms } from "@/lib/supabase/actions";
 import { redirect } from "next/navigation";
+import { AddProgramDialog } from "@/components/admin/add-program-dialog";
 
 export default async function ProgramsManagementPage() {
     const supabase = await createSupabaseServerClient();
@@ -28,7 +29,7 @@ export default async function ProgramsManagementPage() {
     const programs = await getAdminPrograms();
 
     const totalBudget = programs.reduce((acc: number, p: any) => acc + (p.total_budget || 0), 0);
-    const totalApplicants = 1482; // Future: fetch from summary table/aggregate
+    const totalApplicants = programs.reduce((acc: number, p: any) => acc + (p.applicants_count || 0), 0);
     const avgPlacement = programs.length > 0
         ? (programs.reduce((acc: number, p: any) => acc + (p.placement_rate || 0), 0) / programs.length).toFixed(0)
         : "0";
@@ -51,9 +52,12 @@ export default async function ProgramsManagementPage() {
             title="Programs Management"
             description="Manage programme capacity, performance, regional delivery, and budget allocation."
             action={
-                <Button asChild>
-                    <Link href="/admin/cohorts">Open Cohorts Management</Link>
-                </Button>
+                <div className="flex gap-3">
+                    <Button variant="outline" asChild>
+                        <Link href="/admin/cohorts">Manage Cohorts</Link>
+                    </Button>
+                    <AddProgramDialog />
+                </div>
             }
         >
             <div className="space-y-6">
@@ -128,6 +132,7 @@ export default async function ProgramsManagementPage() {
                                     <TableHead>Completion</TableHead>
                                     <TableHead>Placement</TableHead>
                                     <TableHead>Budget</TableHead>
+                                    <TableHead>Demand (Applicants)</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -143,6 +148,7 @@ export default async function ProgramsManagementPage() {
                                         <TableCell>{program.completion_rate || 0}%</TableCell>
                                         <TableCell>{program.placement_rate || 0}%</TableCell>
                                         <TableCell>N{(program.total_budget / 1000000).toFixed(0)}M</TableCell>
+                                        <TableCell>{program.applicants_count || 0}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>

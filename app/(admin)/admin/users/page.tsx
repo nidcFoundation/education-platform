@@ -16,6 +16,7 @@ import { KeyRound, Shield, UserCheck, Users } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getAdminUsers } from "@/lib/supabase/actions";
 import { redirect } from "next/navigation";
+import { UserActionsDropdown } from "@/components/admin/user-actions-dropdown";
 
 function getUserStatusClass(status: string) {
     if (status === "active") return "bg-emerald-100 text-emerald-800";
@@ -53,7 +54,7 @@ export default async function UserManagementPage() {
         { title: "Total Users", value: allUsers.length.toString(), description: "All registered accounts", icon: Users },
         { title: "Privileged Access", value: privilegedUsers.length.toString(), description: "Admins, reviewers, partners", icon: Shield },
         { title: "Pending Accounts", value: pendingUsers.length.toString(), description: "Awaiting confirmation", icon: UserCheck },
-        { title: "MFA Coverage", value: "92%", description: "Estimated across staff", icon: KeyRound },
+        { title: "Active Accounts", value: allUsers.filter((u: any) => u.status === "active").length.toString(), description: "Verified platform users", icon: KeyRound },
     ];
 
     const displayUsers = allUsers.slice(0, 10); // Show latest 10 for performance
@@ -143,9 +144,12 @@ export default async function UserManagementPage() {
                                         <TableCell>{u.email}</TableCell>
                                         <TableCell>{new Date(u.created_at).toLocaleDateString()}</TableCell>
                                         <TableCell>
-                                            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${getUserStatusClass(u.status)}`}>
-                                                {u.status}
-                                            </span>
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${getUserStatusClass(u.status)}`}>
+                                                    {u.status}
+                                                </span>
+                                                <UserActionsDropdown userId={u.id} currentRole={u.role} currentStatus={u.status} />
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}

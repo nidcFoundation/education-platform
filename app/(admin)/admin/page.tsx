@@ -27,7 +27,7 @@ import {
     Users,
 } from "lucide-react";
 import { getAdminDashboardData } from "@/lib/supabase/actions";
-import { adminFundingDistribution, adminSectionLinks } from "@/lib/constants";
+import { adminSectionLinks } from "@/lib/constants";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { resolveUserRoleForSession } from "@/lib/auth/roles";
 import { redirect } from "next/navigation";
@@ -59,6 +59,7 @@ export default async function AdminDashboardPage() {
         applicationCounts,
         averageReviewCompletion,
         totalFunding,
+        fundingDistribution,
         applications,
         cohorts,
         programs,
@@ -156,7 +157,7 @@ export default async function AdminDashboardPage() {
                                 </div>
                                 <div className="mt-4 space-y-4">
                                     {[
-                                         { label: "Review queue", value: (applicationCounts.reviewQueue || 0).toLocaleString(), detail: "Applications pending internal reviewer action" },
+                                        { label: "Review queue", value: (applicationCounts.reviewQueue || 0).toLocaleString(), detail: "Applications pending internal reviewer action" },
                                         { label: "Active scholars", value: counts.scholars.toLocaleString(), detail: "Scholars currently tracked across all programs" },
                                         { label: "Live cohorts", value: cohorts.length.toString(), detail: "Scholar intake windows currently being managed" },
                                     ].map((item) => (
@@ -284,7 +285,7 @@ export default async function AdminDashboardPage() {
                             <CardDescription>How programme funding is currently deployed across the platform.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            {adminFundingDistribution.map((item) => (
+                            {(fundingDistribution || []).map((item) => (
                                 <div key={item.label} className="rounded-xl border bg-background p-4">
                                     <div className="flex items-start justify-between gap-4">
                                         <div>

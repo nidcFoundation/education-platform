@@ -43,7 +43,8 @@ export default async function FundingManagementPage() {
     const committed = ledger.filter((l: any) => l.status === "pending" || l.status === "Committed").reduce((acc: number, l: any) => acc + Number(l.amount), 0);
     const disbursed = ledger.filter((l: any) => l.status === "completed" || l.status === "Disbursed").reduce((acc: number, l: any) => acc + Number(l.amount), 0);
     const flagged = ledger.filter((l: any) => l.status === "flagged" || l.status === "Flagged").reduce((acc: number, l: any) => acc + Number(l.amount), 0);
-    const reserved = 640000000; // Mock or future: fetch from treasury table
+    const totalPledged = sponsors.reduce((acc: number, s: any) => acc + (Number(s.donor_details?.commitment) || 0), 0);
+    const reserved = Math.max(0, totalPledged - (committed + disbursed + flagged));
 
     const fundingMetrics = [
         { title: "Committed", value: `N${(committed / 1000000000).toFixed(2)}B`, description: "Approved sponsor funding", icon: WalletCards },

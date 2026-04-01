@@ -20,6 +20,7 @@ import {
     adminContentItems,
     contentStatusBreakdown,
 } from "@/lib/constants";
+import { getAdminContent } from "@/lib/supabase/actions";
 
 const contentMetrics = [
     { title: "Content Assets", value: "258", description: "Live, scheduled, and draft assets tracked", icon: LayoutTemplate },
@@ -35,7 +36,19 @@ function getContentStatusClass(status: "Draft" | "In review" | "Scheduled" | "Li
     return "bg-slate-100 text-slate-800";
 }
 
-export default function ContentManagementPage() {
+export default async function ContentManagementPage() {
+    const dbContent = await getAdminContent();
+    const displayItems = dbContent.length > 0
+        ? dbContent.map((c: any) => ({
+            title: c.title,
+            type: c.type,
+            audience: "Platform",
+            owner: c.author || "Admin",
+            updatedAt: new Date(c.published_date || c.created_at || new Date()).toLocaleDateString(),
+            status: (c.status?.charAt(0).toUpperCase() + c.status?.slice(1)) as any || "Draft"
+        }))
+        : adminContentItems;
+
     return (
         <PageContainer
             title="Content Management"
@@ -104,7 +117,7 @@ export default function ContentManagementPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {adminContentItems.map((item) => (
+                                {displayItems.map((item: any) => (
                                     <TableRow key={item.title}>
                                         <TableCell className="font-medium">{item.title}</TableCell>
                                         <TableCell>{item.type}</TableCell>

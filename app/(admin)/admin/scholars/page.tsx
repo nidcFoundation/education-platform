@@ -155,12 +155,14 @@ export default async function ScholarManagementPage() {
                   className="rounded-xl border bg-background p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium">{scholar.first_name} {scholar.last_name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {scholar.program || "No program assigned"}
-                      </p>
-                    </div>
+                    <Link href={`/admin/scholars/profiles/${scholar.id}`} className="hover:underline">
+                      <div>
+                        <p className="font-medium text-primary">{scholar.first_name} {scholar.last_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {scholar.program || "No program assigned"}
+                        </p>
+                      </div>
+                    </Link>
                     <Badge variant="outline">{scholar.status || "active"}</Badge>
                   </div>
                   <div className="mt-4 space-y-2">
@@ -210,12 +212,14 @@ export default async function ScholarManagementPage() {
                 {scholars.map((scholar) => (
                   <TableRow key={scholar.id}>
                     <TableCell>
-                      <div>
-                        <p className="font-medium">{scholar.first_name} {scholar.last_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {scholar.program || "General"}
-                        </p>
-                      </div>
+                      <Link href={`/admin/scholars/profiles/${scholar.id}`} className="hover:underline">
+                        <div>
+                          <p className="font-medium text-primary">{scholar.first_name} {scholar.last_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {scholar.program || "General"}
+                          </p>
+                        </div>
+                      </Link>
                     </TableCell>
                     <TableCell>Cohort {scholar.cohort || "2024"}</TableCell>
                     <TableCell className="min-w-44">

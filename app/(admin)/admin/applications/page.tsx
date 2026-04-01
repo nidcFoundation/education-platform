@@ -182,12 +182,14 @@ export default async function ApplicationsManagementPage() {
                                 {visibleApplications.map((application: AdminApplication) => (
                                     <TableRow key={application.id}>
                                         <TableCell>
-                                            <div>
-                                                <p className="font-medium">
-                                                    {application.profiles?.first_name} {application.profiles?.last_name}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">{application.id.slice(0, 8)}</p>
-                                            </div>
+                                            <Link href={`/admin/applications/review?id=${application.id}`} className="hover:underline">
+                                                <div>
+                                                    <p className="font-medium text-primary">
+                                                        {application.profiles?.first_name} {application.profiles?.last_name}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">{application.id.slice(0, 8)}</p>
+                                                </div>
+                                            </Link>
                                         </TableCell>
                                         <TableCell>{application.profiles?.email || "No email available"}</TableCell>
                                         <TableCell>

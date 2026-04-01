@@ -698,6 +698,26 @@ function formatSupabaseError(error: unknown): string {
     }
 }
 
+export async function getAdminContent() {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.from("content_assets").select("*").order("published_date", { ascending: false });
+    if (error) {
+        console.error("Error fetching content:", error);
+        return [];
+    }
+    return data;
+}
+
+export async function getAdminImpactReports() {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.from("impact_reports").select("*").order("published_date", { ascending: false });
+    if (error) {
+        console.error("Error fetching impact reports:", error);
+        return [];
+    }
+    return data;
+}
+
 function getDaysUntilDueDate(dueDate: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -895,14 +915,16 @@ export async function getAdminDashboardData() {
         applications,
         baseCohorts,
         programsRes,
-        fundingRes
+        fundingRes,
+        fundingRecordsRes
     ] = await Promise.all([
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "scholar"),
         supabase.from("profiles").select("*", { count: "exact", head: true }).eq("role", "donor"),
         fetchAdminApplicationsData(supabase),
         getAdminCohortsData(supabase),
         supabase.from("programs").select("*"),
-        supabase.from("donor_details").select("commitment")
+        supabase.from("donor_details").select("commitment"),
+        supabase.from("funding_records").select("*, programs(*)")
     ]);
 
     const nonDraftApplications = applications.filter((application) =>
@@ -927,6 +949,25 @@ export async function getAdminDashboardData() {
 
     const totalFunding = fundingRes.data?.reduce((sum, d) => sum + (Number(d.commitment) || 0), 0) || 0;
 
+    const programFunding = (fundingRecordsRes.data || []).reduce((acc: any, curr: any) => {
+        const progName = curr.programs?.name || "Unassigned Operations";
+        acc[progName] = (acc[progName] || 0) + Number(curr.amount);
+        return acc;
+    }, {});
+
+    const fundingDistribution = Object.entries(programFunding)
+        .sort(([, a]: any, [, b]: any) => b - a)
+        .slice(0, 5)
+        .map(([label, amount]: [string, any]) => {
+            const percentage = totalFunding > 0 ? Math.round((amount / totalFunding) * 100) : 0;
+            return {
+                label,
+                value: percentage,
+                description: `Allocated to ${label} scholars and operations`,
+                meta: `N${(amount / 1000000).toFixed(1)}M Tracked`
+            };
+        });
+
     return {
         counts,
         applicationCounts: {
@@ -936,6 +977,7 @@ export async function getAdminDashboardData() {
         },
         averageReviewCompletion,
         totalFunding,
+        fundingDistribution,
         applications: applications.slice(0, 10), // Show everything recent, including drafts
         cohorts,
         programs: sortProgramsByName(normalizeProgramsList(programsRes.data)),
@@ -1039,15 +1081,28 @@ export async function getAdminSponsors() {
 
 export async function getAdminPrograms() {
     const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-        .from("programs")
-        .select("*");
+    const [programsRes, applications] = await Promise.all([
+        supabase.from("programs").select("*"),
+        fetchAdminApplicationsData(supabase),
+    ]);
 
-    if (error) {
-        console.error("Error fetching admin programs:", formatSupabaseError(error));
+    if (programsRes.error) {
+        console.error("Error fetching admin programs:", formatSupabaseError(programsRes.error));
         return [];
     }
-    return sortProgramsByName(normalizeProgramsList(data));
+
+    const normalizedPrograms = sortProgramsByName(normalizeProgramsList(programsRes.data));
+
+    return normalizedPrograms.map((program: any) => {
+        const programApps = (applications || []).filter(
+            (app: any) => getTrimmedString(app.program_id) === program.id
+        );
+
+        return {
+            ...program,
+            applicants_count: programApps.length,
+        };
+    });
 }
 
 export async function getAdminCohorts() {
@@ -1860,3 +1915,73 @@ export async function getAvailableCohorts() {
         programName: (row.programs as any)?.title || "Unknown Program"
     }));
 }
+
+export async function createSponsor(data: { email: string; first_name: string; last_name: string; commitment: number; category: string; investment_focus: string }) {
+    const supabaseAdmin = createSupabaseAdminClient();
+
+    // 1. Create secure auth user bypassing normal signup
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: data.email,
+        password: crypto.randomUUID(), // They'll receive a recovery link to set this
+        email_confirm: true,
+        user_metadata: {
+            first_name: data.first_name,
+            last_name: data.last_name,
+        }
+    });
+
+    if (authError || !authData.user) {
+        return { error: authError?.message || "Failed to create donor account." };
+    }
+
+    const userId = authData.user.id;
+
+    // 2. Update profile with proper role
+    const { error: profileError } = await supabaseAdmin
+        .from("profiles")
+        .update({ role: "donor" })
+        .eq("id", userId);
+
+    if (profileError) {
+        return { error: "Created authentication, but failed to assign donor role." };
+    }
+
+    // 3. Insert robust donor details
+    const { error: donorError } = await supabaseAdmin
+        .from("donor_details")
+        .insert({
+            id: userId,
+            commitment: data.commitment,
+            category: data.category,
+            investment_focus: data.investment_focus,
+            status: "Active"
+        });
+
+    if (donorError) {
+        return { error: donorError.message || "Failed to initialize standard donor ledger details." };
+    }
+
+    return { success: true };
+}
+
+export async function createProgram(data: { name: string; title: string; total_budget: number; program_lead: string }) {
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase
+        .from("programs")
+        .insert({
+            // normalize name/title logically
+            name: data.name,
+            title: data.title,
+            total_budget: data.total_budget,
+            program_lead: data.program_lead,
+            placement_rate: 0,
+            completion_rate: 0
+        });
+
+    if (error) {
+        return { error: error.message };
+    }
+    return { success: true };
+}
+
+
