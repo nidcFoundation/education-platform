@@ -16,9 +16,8 @@ import { Flag, GraduationCap, ListChecks, Users } from "lucide-react";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getAdminCohorts } from "@/lib/supabase/actions";
 import { redirect } from "next/navigation";
-import { AdminCohort } from "@/types";
 
-
+type AdminCohort = Awaited<ReturnType<typeof getAdminCohorts>>[number];
 
 export default async function CohortsManagementPage() {
     const supabase = await createSupabaseServerClient();
@@ -27,7 +26,7 @@ export default async function CohortsManagementPage() {
     if (!user) {
         redirect("/login");
     }
-    
+
     const cohorts = await getAdminCohorts();
 
     const totalScholars = cohorts.reduce((acc: number, c: AdminCohort) => acc + (c.active_scholars_count || 0), 0);

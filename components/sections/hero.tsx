@@ -9,13 +9,21 @@ export function Hero() {
             <div className="container mx-auto px-4 md:px-6">
                 <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
                     <div className="space-y-8 lg:max-w-xl">
+                        <div className="animate-fade-in-up">
+                            <div className="inline-block px-4 py-1.5 bg-primary/10 text-forground/10 text-sm text-center rounded-full">
+                                Transforming Lives Through Education
+                            </div>
+                        </div>
+
                         <div className="space-y-6">
-                            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-[#1A1A1A] leading-[1.1]">
-                                Building Nigeria&apos;s Most Critical <br />
-                                <span className="text-primary">Talent Infrastructure</span>
+                            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-[#1A1A1A] leading-[1.1]">
+                                Every Student <br className="max-sm:hidden" />
+                                <span className="text-primary">Deserves a Chance</span>
                             </h1>
-                            <p className="text-lg md:text-xl text-[#4A4A4A] leading-relaxed">
-                                A national commitment to identify, fund, and deploy exceptional Nigerian talent — transforming brilliance into measurable impact across every sector of the economy.
+                            <p className="text-md md:text-xl text-[#4A4A4A] leading-relaxed">
+                                We connect talented Nigerian students who face financial barriers with
+                                partner universities and funding opportunities — creating pathways to
+                                higher education and brighter futures.
                             </p>
                         </div>
                         <div className="flex flex-wrap gap-4 items-center">

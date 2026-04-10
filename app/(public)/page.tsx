@@ -89,7 +89,7 @@ export default async function HomePage() {
             >
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
                     {[
-                        { icon: Users, title: "The Access Gap", desc: "Over 1.9 million qualified students are unable to access tertiary education annually due to financial constraints, independent of academic excellence." },
+                        { icon: Users, title: "The Access Gap", dJesc: "Over 1.9 million qualified students are unable to access tertiary education annually due to financial constraints, independent of academic excellence." },
                         { icon: TrendingUp, title: "Economic Leakage", desc: "Without structured talent pipelines, Nigeria loses billions annually to brain drain — top talent educated aboard who do not return to drive national growth." },
                         { icon: Building2, title: "Institutional Deficit", desc: "Top-tier organisations face sustained challenges sourcing globally competitive local talent, slowing innovation and national productivity growth." },
                     ].map((item, i) => (

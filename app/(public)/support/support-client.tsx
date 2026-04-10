@@ -4,6 +4,7 @@ import Link from "next/link";
 import React from "react";
 import {
   ArrowRight,
+  CircleAlert,
   CircleCheck,
   Handshake,
   HeartHandshake,
@@ -63,19 +64,67 @@ export function SupportClient({ initialType }: { initialType: SupportType }) {
   const [submittedEmail, setSubmittedEmail] = React.useState<string | null>(
     null
   );
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const activeCopy = SUPPORT_COPY[supportType];
   const ActiveIcon = activeCopy.icon;
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const form = event.currentTarget;
     const formData = new FormData(form);
+    const name = formData.get("name")?.toString().trim() ?? "";
     const email = formData.get("email")?.toString().trim() ?? "";
+    const message = formData.get("message")?.toString().trim() ?? "";
+    const selectedSupportType =
+      formData.get("supportType")?.toString().trim() ?? "";
 
-    setSubmittedEmail(email);
-    form.reset();
+    if (!name || !email || !message || !selectedSupportType) {
+      setErrorMessage("Complete all fields before submitting your request.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch("/api/support", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          supportType: selectedSupportType,
+          name,
+          email,
+          message,
+        }),
+      });
+
+      const result = (await response.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+
+      if (!response.ok) {
+        setErrorMessage(
+          result?.error ?? "Unable to submit your request right now."
+        );
+        return;
+      }
+
+      setSubmittedEmail(email);
+      form.reset();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to submit your request right now."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -165,7 +214,21 @@ export function SupportClient({ initialType }: { initialType: SupportType }) {
                       </p>
                     </div>
 
+                    {errorMessage && (
+                      <Alert variant="destructive">
+                        <CircleAlert className="h-4 w-4" />
+                        <AlertTitle>Submission failed</AlertTitle>
+                        <AlertDescription>{errorMessage}</AlertDescription>
+                      </Alert>
+                    )}
+
                     <form onSubmit={handleSubmit} className="space-y-5">
+                      <input
+                        type="hidden"
+                        name="supportType"
+                        value={supportType}
+                      />
+
                       <div className="space-y-2">
                         <Label htmlFor="support-type">Type of Support</Label>
                         <Select
@@ -235,8 +298,14 @@ export function SupportClient({ initialType }: { initialType: SupportType }) {
                         </div>
                       </div>
 
-                      <Button className="w-full h-11 font-semibold" size="lg">
-                        {activeCopy.submitLabel}
+                      <Button
+                        className="w-full h-11 font-semibold"
+                        size="lg"
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting
+                          ? "Submitting request..."
+                          : activeCopy.submitLabel}
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>
                     </form>
