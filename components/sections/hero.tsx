@@ -1,54 +1,47 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Heart } from "lucide-react";
 
 export function Hero() {
     return (
-        <section className="bg-[#F9F6F3] py-20 lg:py-32 overflow-hidden">
-            <div className="container mx-auto px-4 md:px-6">
-                <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-                    <div className="space-y-8 lg:max-w-xl">
-                        <div className="space-y-6">
-                            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-[#1A1A1A] leading-[1.1]">
-                                Building Nigeria&apos;s Most Critical <br />
-                                <span className="text-primary">Talent Infrastructure</span>
-                            </h1>
-                            <p className="text-lg md:text-xl text-[#4A4A4A] leading-relaxed">
-                                A national commitment to identify, fund, and deploy exceptional Nigerian talent — transforming brilliance into measurable impact across every sector of the economy.
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap gap-4 items-center">
-                            <Link href="/apply">
-                                <Button size="lg" className="rounded-full px-8 py-6 text-base font-semibold bg-[#1A1A1A] text-white hover:bg-[#2A2A2A]">
-                                    Apply for Scholarship <ArrowRight className="ml-2 h-5 w-5" />
-                                </Button>
-                            </Link>
-                            <Link href="/donate">
-                                <Button size="lg" variant="outline" className="rounded-full px-8 py-6 text-base font-semibold border-[#1A1A1A] text-[#1A1A1A] hover:bg-muted/50">
-                                    Become a Donor
-                                </Button>
-                            </Link>
-                            <Link href="/partner-with-us" className="text-sm font-semibold text-[#4A4A4A] hover:text-primary transition-colors ml-2">
-                                Partner with Us
-                            </Link>
-                        </div>
-                    </div>
+      <section className="relative pt-32 pb-20 px-6 overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.03]">
+          <div className="absolute top-20 left-10 w-96 h-96 bg-[#c87941] rounded-full blur-3xl"></div>
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-[#8b6f47] rounded-full blur-3xl"></div>
+        </div>
 
-                    <div className="relative">
-                        <div className="aspect-[4/5] rounded-[2.5rem] overflow-hidden bg-[#D1E8E2]">
-                            <Image
-                                src="/hero-student.png"
-                                alt="Nigerian Student Scholar"
-                                fill
-                                className="object-cover"
-                                priority
-                            />
-                        </div>
-                        <div className="absolute -z-10 -bottom-10 -right-10 w-64 h-64 rounded-full bg-primary/10 blur-3xl opacity-50" />
-                    </div>
-                </div>
+        <div className="max-w-6xl mx-auto relative">
+          <div className="text-center max-w-4xl mx-auto">
+            <div className="animate-fade-in-up">
+              <div className="inline-block px-4 py-1.5 bg-[#c87941]/10 text-[#c87941] text-sm font-medium rounded-full mb-6">
+                Transforming Lives Through Education
+              </div>
             </div>
-        </section>
+
+            <h1 className="font-serif font-bold text-6xl md:text-7xl lg:text-8xl leading-[1.1] mb-8 animate-fade-in-up delay-1">
+              Building Nigeria’s Next Generation of System Builders
+              <br />
+            </h1>
+
+            <p className="text-xl md:text-2xl text-[#5a524d] leading-relaxed mb-12 max-w-3xl mx-auto font-light animate-fade-in-up delay-2">
+              A structured system for identifying, developing, and deploying
+              individuals committed to building real systems across engineering,
+              technology, and infrastructure
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up delay-3">
+              <Button className={`px-8 py-4 bg-[#c87941] text-white font-medium rounded-full hover:bg-[#b36935] transition-all hover:shadow-2xl hover:scale-105 flex items-center justify-center gap-2 group`}>
+                Join now
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Button>
+              <button className="px-8 py-4 bg-white text-[#c87941] font-medium rounded-full border-2 border-[#c87941] hover:bg-[#c87941] hover:text-white transition-all flex items-center justify-center gap-2">
+                <Heart className="w-5 h-5" />
+                Learn more
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
     );
 }

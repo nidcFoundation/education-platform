@@ -7,6 +7,12 @@ export const metadata: Metadata = {
 };
 
 import { Toaster } from "sonner";
+import { ThemeProvider } from "@/components/ui/theme-provider";
+import { Inter } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const inter = Inter({subsets:['latin'],variable:'--font-sans'});
+
 
 export default function RootLayout({
   children,
@@ -14,10 +20,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning className={cn("font-sans", inter.variable)}>
       <body className="font-sans antialiased">
-        {children}
-        <Toaster position="top-center" richColors />
+           <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+            <Toaster position="top-center" richColors />
+          </ThemeProvider>
+        
       </body>
     </html>
   );
