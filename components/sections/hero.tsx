@@ -1,54 +1,201 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { useEffect, useRef } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Heart } from "lucide-react";
 
-export function Hero() {
-    return (
-        <section className="bg-[#F9F6F3] py-20 lg:py-32 overflow-hidden">
-            <div className="container mx-auto px-4 md:px-6">
-                <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-                    <div className="space-y-8 lg:max-w-xl">
-                        <div className="space-y-6">
-                            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-[#1A1A1A] leading-[1.1]">
-                                Building Nigeria&apos;s Most Critical <br />
-                                <span className="text-primary">Talent Infrastructure</span>
-                            </h1>
-                            <p className="text-lg md:text-xl text-[#4A4A4A] leading-relaxed">
-                                A national commitment to identify, fund, and deploy exceptional Nigerian talent — transforming brilliance into measurable impact across every sector of the economy.
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap gap-4 items-center">
-                            <Link href="/apply">
-                                <Button size="lg" className="rounded-full px-8 py-6 text-base font-semibold bg-[#1A1A1A] text-white hover:bg-[#2A2A2A]">
-                                    Apply for Scholarship <ArrowRight className="ml-2 h-5 w-5" />
-                                </Button>
-                            </Link>
-                            <Link href="/donate">
-                                <Button size="lg" variant="outline" className="rounded-full px-8 py-6 text-base font-semibold border-[#1A1A1A] text-[#1A1A1A] hover:bg-muted/50">
-                                    Become a Donor
-                                </Button>
-                            </Link>
-                            <Link href="/partner-with-us" className="text-sm font-semibold text-[#4A4A4A] hover:text-primary transition-colors ml-2">
-                                Partner with Us
-                            </Link>
-                        </div>
-                    </div>
+gsap.registerPlugin(ScrollTrigger);
 
-                    <div className="relative">
-                        <div className="aspect-[4/5] rounded-[2.5rem] overflow-hidden bg-[#D1E8E2]">
-                            <Image
-                                src="/hero-student.png"
-                                alt="Nigerian Student Scholar"
-                                fill
-                                className="object-cover"
-                                priority
-                            />
-                        </div>
-                        <div className="absolute -z-10 -bottom-10 -right-10 w-64 h-64 rounded-full bg-primary/10 blur-3xl opacity-50" />
-                    </div>
+export default function Hero() {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const subtitleRef = useRef<HTMLParagraphElement | null>(null);
+  const ctaRef = useRef<HTMLDivElement | null>(null);
+  const imageRef = useRef<HTMLDivElement | null>(null);
+  const glow1 = useRef<HTMLDivElement | null>(null);
+  const glow2 = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+
+      tl.from(titleRef.current, { y: 80, opacity: 0, duration: 1 })
+        .from(
+          subtitleRef.current,
+          { y: 40, opacity: 0, duration: 0.8 },
+          "-=0.6"
+        )
+        .from(
+          ctaRef.current?.children || [],
+          { y: 30, opacity: 0, stagger: 0.15, duration: 0.6 },
+          "-=0.5"
+        )
+        .from(
+          imageRef.current,
+          { scale: 0.9, opacity: 0, duration: 1.2 },
+          "-=0.8"
+        );
+
+      gsap.to(glow1.current, {
+        x: 60,
+        y: -40,
+        duration: 8,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut",
+      });
+      gsap.to(glow2.current, {
+        x: -50,
+        y: 50,
+        duration: 10,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut",
+      });
+
+      gsap.to(imageRef.current, {
+        y: -80,
+        scrollTrigger: {
+          trigger: containerRef.current,
+          start: "top top",
+          scrub: true,
+        },
+      });
+    }, containerRef);
+
+    return () => ctx.revert();
+  }, []);
+
+  return (
+    <section
+      ref={containerRef}
+      className="relative overflow-hidden pt-24 md:pt-32 pb-20 md:pb-24 px-4 sm:px-6"
+    >
+      {/* Background Glow */}
+      <div className="absolute inset-0 -z-10">
+        <div
+          ref={glow1}
+          className="absolute top-20 left-10 w-[300px] md:w-[400px] h-[300px] md:h-[400px] bg-primary/20 blur-3xl rounded-full"
+        />
+        <div
+          ref={glow2}
+          className="absolute bottom-20 right-10 w-[300px] md:w-[400px] h-[300px] md:h-[400px] bg-orange-400/20 blur-3xl rounded-full"
+        />
+      </div>
+
+      <div className="px-14 mx-auto grid md:grid-cols-2 gap-10 lg:gap-16 items-center">
+        {/* ── Text Section ── */}
+        <div className="text-center md:text-left order-1">
+          {/* Editorial label */}
+          <p className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-3 justify-center md:justify-start mb-5">
+            <span className="inline-block w-7 h-px bg-primary" />
+            Transforming Lives Through Education
+          </p>
+
+          {/* Headline — scaled down for mobile */}
+          <h1
+            ref={titleRef}
+            className="font-serif font-bold text-4xl sm:text-5xl md:text-5xl lg:text-6xl xl:text-7xl leading-tight tracking-tight mb-5"
+          >
+            Every Student
+            <br />
+            Deserves
+            <br />
+            <span className="text-secondary font-medium">a Chance.</span>
+          </h1>
+
+          <p
+            ref={subtitleRef}
+            className="text-base md:text-lg text-muted-foreground mb-8 max-w-lg mx-auto md:mx-0 leading-relaxed"
+          >
+            We connect talented Nigerian students with funding and universities
+            — unlocking access to higher education and life-changing
+            opportunities.
+          </p>
+
+          {/* CTAs */}
+          <div
+            ref={ctaRef}
+            className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start mb-8"
+          >
+            <Link href="/apply" className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto px-7 py-5 text-sm rounded-md flex items-center justify-center gap-2 group">
+                Apply for Scholarship
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </Link>
+            <Link href="/donate" className="w-full sm:w-auto">
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto px-7 py-5 text-sm rounded-md flex items-center justify-center gap-2"
+              >
+                <Heart className="w-4 h-4" />
+                Support a Student
+              </Button>
+            </Link>
+          </div>
+
+          {/* Stats row */}
+          <div className="flex border-y border-border/50 divide-x divide-border/50 max-w-sm mx-auto md:mx-0">
+            {[
+              { value: "5,000+", label: "Students" },
+              { value: "₦200M+", label: "Funding" },
+              { value: "20+", label: "Universities" },
+            ].map((stat, i) => (
+              <div
+                key={i}
+                className={`flex-1 py-3 ${
+                  i === 0 ? "pr-4" : i === 2 ? "pl-4" : "px-4"
+                }`}
+              >
+                <div className="text-lg font-bold tracking-tight text-foreground leading-none">
+                  {stat.value}
                 </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {stat.label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Image Section ── */}
+        {/* pb-8 gives clearance so the absolutely-positioned floating card doesn't overflow */}
+        <div
+          ref={imageRef}
+          className="relative flex justify-center order-2 pb-8 sm:pb-10 mt-4 md:mt-0"
+        >
+          <div className="relative w-full max-w-md md:max-w-none">
+            <Image
+              src="/hero-students.png"
+              alt="Students celebrating scholarship"
+              width={600}
+              height={500}
+              className="rounded-xl shadow-xl w-full object-cover"
+            />
+
+            {/* Floating card — hidden on very small screens to prevent overflow */}
+            <div className="hidden sm:block absolute -bottom-5 -left-4 md:-left-5 bg-background border border-border rounded-xl p-3 md:p-4 shadow-md min-w-[150px] md:min-w-[160px]">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+                Scholarships Awarded
+              </p>
+              <p className="text-xl md:text-2xl font-bold tracking-tight text-foreground">
+                ₦200M+
+              </p>
+              <div className="flex items-center gap-1.5 mt-2">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500" />
+                <span className="text-[11px] text-green-600 dark:text-green-400 font-medium">
+                  Active programme
+                </span>
+              </div>
             </div>
-        </section>
-    );
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
