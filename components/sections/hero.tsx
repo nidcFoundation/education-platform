@@ -87,7 +87,7 @@ export default function Hero() {
         />
       </div>
 
-      <div className="px-14 mx-auto grid md:grid-cols-2 gap-10 lg:gap-16 items-center">
+      <div className="md:px-14 mx-auto grid md:grid-cols-2 gap-10 lg:gap-16 items-center">
         {/* ── Text Section ── */}
         <div className="text-center md:text-left order-1">
           {/* Editorial label */}
@@ -148,9 +148,8 @@ export default function Hero() {
             ].map((stat, i) => (
               <div
                 key={i}
-                className={`flex-1 py-3 ${
-                  i === 0 ? "pr-4" : i === 2 ? "pl-4" : "px-4"
-                }`}
+                className={`flex-1 py-3 ${i === 0 ? "pr-4" : i === 2 ? "pl-4" : "px-4"
+                  }`}
               >
                 <div className="text-lg font-bold tracking-tight text-foreground leading-none">
                   {stat.value}
@@ -179,7 +178,7 @@ export default function Hero() {
             />
 
             {/* Floating card — hidden on very small screens to prevent overflow */}
-            <div className="hidden sm:block absolute -bottom-5 -left-4 md:-left-5 bg-background border border-border rounded-xl p-3 md:p-4 shadow-md min-w-[150px] md:min-w-[160px]">
+            <div className="hidden min-[400px]:block absolute -bottom-5 -left-2 md:-left-5 bg-background border border-border rounded-xl p-3 md:p-4 shadow-md min-w-[140px] md:min-w-[160px]">
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
                 Scholarships Awarded
               </p>
